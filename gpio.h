@@ -2,13 +2,11 @@
  * gpio.h
  *
  *  Created on: Apr 18, 2015
- *      Author: IEUser
+ *      Author: Stefan
  */
 
 #ifndef GPIO_H_
 #define GPIO_H_
-
-
 
 #endif /* GPIO_H_ */
 

@@ -13,15 +13,13 @@ C_SRCS += \
 ../bitbang_spi.c \
 ../cc1101.c \
 ../gpio.c \
-../serial_loop.c \
-../spi.c 
+../serial_loop.c 
 
 OBJS += \
 ./bitbang_spi.obj \
 ./cc1101.obj \
 ./gpio.obj \
 ./serial_loop.obj \
-./spi.obj \
 ./vectors.obj 
 
 ASM_DEPS += \
@@ -31,22 +29,19 @@ C_DEPS += \
 ./bitbang_spi.pp \
 ./cc1101.pp \
 ./gpio.pp \
-./serial_loop.pp \
-./spi.pp 
+./serial_loop.pp 
 
 C_DEPS__QUOTED += \
 "bitbang_spi.pp" \
 "cc1101.pp" \
 "gpio.pp" \
-"serial_loop.pp" \
-"spi.pp" 
+"serial_loop.pp" 
 
 OBJS__QUOTED += \
 "bitbang_spi.obj" \
 "cc1101.obj" \
 "gpio.obj" \
 "serial_loop.obj" \
-"spi.obj" \
 "vectors.obj" 
 
 ASM_DEPS__QUOTED += \
@@ -56,8 +51,7 @@ C_SRCS__QUOTED += \
 "../bitbang_spi.c" \
 "../cc1101.c" \
 "../gpio.c" \
-"../serial_loop.c" \
-"../spi.c" 
+"../serial_loop.c" 
 
 ASM_SRCS__QUOTED += \
 "../vectors.asm" 

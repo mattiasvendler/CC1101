@@ -12,7 +12,6 @@ $(GEN_CMDS__FLAG) \
 "./cc1101.obj" \
 "./gpio.obj" \
 "./serial_loop.obj" \
-"./spi.obj" \
 "./vectors.obj" \
 "../C6713.cmd" \
 -l"libc.a" \
@@ -147,8 +146,8 @@ serial_loop.hex: $(EXE_OUTPUTS)
 # Other Targets
 clean:
 	-$(RM) $(EXE_OUTPUTS__QUOTED)$(BIN_OUTPUTS__QUOTED)
-	-$(RM) "bitbang_spi.pp" "cc1101.pp" "gpio.pp" "serial_loop.pp" "spi.pp" 
-	-$(RM) "bitbang_spi.obj" "cc1101.obj" "gpio.obj" "serial_loop.obj" "spi.obj" "vectors.obj" 
+	-$(RM) "bitbang_spi.pp" "cc1101.pp" "gpio.pp" "serial_loop.pp" 
+	-$(RM) "bitbang_spi.obj" "cc1101.obj" "gpio.obj" "serial_loop.obj" "vectors.obj" 
 	-$(RM) "vectors.pp" 
 	-@echo 'Finished clean'
 	-@echo ' '

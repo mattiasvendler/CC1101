@@ -2,7 +2,7 @@
  * bitbang_spi.h
  *
  *  Created on: May 18, 2015
- *      Author: IEUser
+ *      Author: Stefan
  */
 
 #ifndef BITBANG_SPI_H_

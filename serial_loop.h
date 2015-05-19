@@ -2,7 +2,7 @@
  * serial_loop.h
  *
  *  Created on: May 12, 2015
- *      Author: IEUser
+ *      Author: Stefan
  */
 
 #ifndef SERIAL_LOOP_H_

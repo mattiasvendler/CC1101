@@ -16,15 +16,10 @@ serial_loop.obj: C:/Program\ Files/C6xCSL/include/csl_irq.h
 serial_loop.obj: C:/Program\ Files/C6xCSL/include/csl_irqhal.h
 serial_loop.obj: C:/Program\ Files/C6xCSL/include/csl_timer.h
 serial_loop.obj: C:/Program\ Files/C6xCSL/include/csl_timerhal.h
-serial_loop.obj: C:/Program\ Files/C6xCSL/include/csl_mcbsp.h
-serial_loop.obj: C:/Program\ Files/C6xCSL/include/csl_mcbsphal.h
 serial_loop.obj: C:/Program\ Files/C6xCSL/include/csl_gpio.h
 serial_loop.obj: C:/Program\ Files/C6xCSL/include/csl_gpiohal.h
+serial_loop.obj: C:/TI_DSK/dsk6713revc_files/CCStudio/c6000/dsk6713/include/dsk6713.h
 serial_loop.obj: ../cc1101.h
-serial_loop.obj: ../spi.h
-serial_loop.obj: ../serial_loop.h
-serial_loop.obj: ../gpio.h
-serial_loop.obj: C:/TI_DSK/ccsv6/tools/compiler/c6000_7.4.8/include/stdint.h
 serial_loop.obj: ../ccpacket.h
 serial_loop.obj: ../gpio.h
 
@@ -44,14 +39,9 @@ C:/Program\ Files/C6xCSL/include/csl_irq.h:
 C:/Program\ Files/C6xCSL/include/csl_irqhal.h: 
 C:/Program\ Files/C6xCSL/include/csl_timer.h: 
 C:/Program\ Files/C6xCSL/include/csl_timerhal.h: 
-C:/Program\ Files/C6xCSL/include/csl_mcbsp.h: 
-C:/Program\ Files/C6xCSL/include/csl_mcbsphal.h: 
 C:/Program\ Files/C6xCSL/include/csl_gpio.h: 
 C:/Program\ Files/C6xCSL/include/csl_gpiohal.h: 
+C:/TI_DSK/dsk6713revc_files/CCStudio/c6000/dsk6713/include/dsk6713.h: 
 ../cc1101.h: 
-../spi.h: 
-../serial_loop.h: 
-../gpio.h: 
-C:/TI_DSK/ccsv6/tools/compiler/c6000_7.4.8/include/stdint.h: 
 ../ccpacket.h: 
 ../gpio.h: 

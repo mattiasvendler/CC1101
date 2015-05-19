@@ -20,32 +20,34 @@
  *
  * Author: Daniel Berenguer
  * Creation date: 03/03/2011
+ *
+ * Converted to C code for C6713: Stefan Gvozdenovic
+ * Creation date: 05/19/2015
  */
 
 #include "cc1101.h"
 #include "gpio.h"
-#include "spi.h"
 #include "bitbang_spi.h"
-//#include <csl_mcbsp.h>
-//#include "nvolat.h"
+#include <dsk6713.h>
+#include <csl_gpio.h>
 
-//MCBSP_Handle extern hMcbsp;
+extern GPIO_Handle    hGpio; /* GPIO handle */
 
 /**
  * Macros
  */
-//// Select (SPI) CC1101
-//#define cc1101_Select()  bitClear(PORT_SPI_SS, BIT_SPI_SS)
-//// Deselect (SPI) CC1101
-//#define cc1101_Deselect()  bitSet(PORT_SPI_SS, BIT_SPI_SS)
-//// Wait until SPI MISO line goes low
-//#define wait_Miso()  while(bitRead(PORT_SPI_MISO, BIT_SPI_MISO))
+// Select (SPI) CC1101
+#define cc1101_Select()  GPIO_pinWrite( hGpio, GPIO_PIN0, 0 )
+// Deselect (SPI) CC1101
+#define cc1101_Deselect()  GPIO_pinWrite( hGpio, GPIO_PIN0, 1 )
+// Wait until SPI MISO line goes low
+#define wait_Miso()  while(GPIO_pinRead( hGpio, GPIO_PIN8 ))
 // Get GDO0 pin state
 #define getGDO0state()  bitRead(PORT_GDO0, BIT_GDO0)
-//// Wait until GDO0 line goes high
-//#define wait_GDO0_high()  while(!getGDO0state())
-//// Wait until GDO0 line goes low
-//#define wait_GDO0_low()  while(getGDO0state())
+// Wait until GDO0 line goes high
+#define wait_GDO0_high() while(!GPIO_pinRead( hGpio, GPIO_PIN9 ))
+// Wait until GDO0 line goes low
+#define wait_GDO0_low()  while(GPIO_pinRead( hGpio, GPIO_PIN9 ))
 
 #define false 0
 #define true 1
@@ -98,27 +100,17 @@ void CC1101_setDevAddress(byte addr, bool save);
 void CC1101_setChannel(byte chnl, bool save);
 void CC1101_setCarrierFreq(byte freq);
 
-///**
-// * CC1101
-// *
-// * Class constructor
-// */
-//CC1101_CC1101(void)
-//{
-//  paTableByte = PA_LowPower;            // Priority = Low power
-//}
-
-///**
-// * wakeUp
-// *
-// * Wake up CC1101 from Power Down state
-// */
-//void CC1101::wakeUp(void)
-//{
-//  cc1101_Select();                      // Select CC1101
-//  wait_Miso();                          // Wait until MISO goes low
-//  cc1101_Deselect();                    // Deselect CC1101
-//}
+/**
+ * wakeUp
+ *
+ * Wake up CC1101 from Power Down state
+ */
+void CC1101_wakeUp(void)
+{
+  cc1101_Select();                      // Select CC1101
+  wait_Miso();                          // Wait until MISO goes low
+  cc1101_Deselect();                    // Deselect CC1101
+}
 
 /**
  * CC1101_writeReg
@@ -369,8 +361,6 @@ void CC1101_setDefaultRegs()
  */
 void CC1101_init(void)
 {
-  spi_init();                           // Initialize SPI interface
-  //pinMode(GDO0, INPUT);                 // Config GDO0 as input
 
   CC1101_reset();                              // Reset CC1101
 
@@ -387,14 +377,6 @@ void CC1101_init(void)
   CC1101_setCarrierFreq(CFREQ_315);
   CC1101_disableAddressCheck();
 
-//  //  Serial.print("CC1101_PARTNUM "); //cc1101=0
-//    char temp[5];
-//  	sprintf(temp, "%s",CC1101_readReg(CC1101_PARTNUM, CC1101_STATUS_REGISTER));
-//    printf("CC1101 part number: ",temp);
-//  //  Serial.print("CC1101_VERSION "); //cc1101=4
-//    printf(CC1101_readReg(CC1101_VERSION, CC1101_STATUS_REGISTER));
-//  //  Serial.print("CC1101_MARCSTATE ");
-//    printf(CC1101_readReg(CC1101_MARCSTATE, CC1101_STATUS_REGISTER) & 0x1f);
 }
 
 /**
@@ -503,46 +485,6 @@ void CC1101_setCarrierFreq(byte freq)
   CC1101.carrierFreq = freq;
 }
 
-///**
-// * setRegsFromEeprom
-// *
-// * Set registers from EEPROM
-// */
-//void CC1101::setRegsFromEeprom(void)
-//{
-//  byte bVal;
-//  byte arrV[2];
-//
-//  // Read RF channel from EEPROM
-//  bVal = EEPROM.read(EEPROM_FREQ_CHANNEL);
-//  // Set RF channel
-//  if (bVal < NUMBER_OF_FCHANNELS )
-//    setChannel(bVal, false);
-//  // Read Sync word from EEPROM
-//  arrV[0] = EEPROM.read(EEPROM_SYNC_WORD);
-//  arrV[1] = EEPROM.read(EEPROM_SYNC_WORD + 1);
-//  // Set Sync word. 0x00 and 0xFF values are not allowed
-//  if (((arrV[0] != 0x00) && (arrV[0] != 0xFF)) || ((arrV[1] != 0x00) && (arrV[1] != 0xFF)))
-//    setSyncWord(arrV, false);
-//  // Read device address from EEPROM
-//  bVal = EEPROM.read(EEPROM_DEVICE_ADDR);
-//  // Set device address
-//  if (bVal > 0)
-//    setDevAddress(bVal, false);
-//}
-
-///**
-// * setPowerDownState
-// *
-// * Put CC1101 into power-down state
-// */
-//void CC1101_setPowerDownState()
-//{
-//  // Comming from RX state, we need to enter the IDLE state first
-//  cmdStrobe(CC1101_SIDLE);
-//  // Enter Power-down state
-//  cmdStrobe(CC1101_SPWD);
-//}
 
 /**
  * sendData
@@ -590,22 +532,9 @@ boolean CC1101_sendData(CCPACKET packet)
   setTxState();
 
 
-//  while(!((marcState == 0x13) || (marcState == 0x14) || (marcState == 0x15)))
-//  {
-//
-//// 	    if (marcState == 0x11)        // RX_OVERFLOW
-////	      flushRxFifo();              // flush receive queue
-////
-//	    if (marcState == 0x16)        // TX_UNDERFLOW
-//	      flushTxFifo();              // flush receive queue
-//
-//	  // CCA enabled: will enter TX state only if the channel is clear
-//	  setTxState();
-//
-	  // Check that TX state is being entered (state = RXTX_SETTLING)
-	  marcState = readStatusReg(CC1101_MARCSTATE) & 0x1F;
-//  }
-	  //DSK6713_waitusec(1000);
+  // Check that TX state is being entered (state = RXTX_SETTLING)
+  marcState = readStatusReg(CC1101_MARCSTATE) & 0x1F;
+
 
   if((marcState != 0x13) && (marcState != 0x14) && (marcState != 0x15))
   {
@@ -628,15 +557,6 @@ boolean CC1101_sendData(CCPACKET packet)
   if((readStatusReg(CC1101_TXBYTES) & 0x7F) == 0)
     return true;
 
-//  setIdleState();       // Enter IDLE state
-//  flushTxFifo();        // Flush Tx FIFO
-//
-//  // Enter back into RX state
-//  setRxState();
-//
-//  // Declare to be in Rx state
-//  CC1101.rfState = RFSTATE_RX;
-
   return false;
 }
 
@@ -652,47 +572,11 @@ boolean CC1101_sendData(CCPACKET packet)
  */
 byte CC1101_receiveData(CCPACKET * packet)
 {
-//  byte val;
-//  byte rxBytes = readStatusReg(CC1101_RXBYTES);
-//
-//  // Any byte waiting to be read and no overflow?
-//  if (rxBytes & 0x7F && !(rxBytes & 0x80))
-//  {
-//    // Read data length
-//    packet->length = readConfigReg(CC1101_RXFIFO);
-//    // If packet is too long
-//    if (packet->length > CC1101_DATA_LEN)
-//      packet->length = 0;   // Discard packet
-//    else
-//    {
-//      // Read data packet
-//      CC1101_readBurstReg(packet->data, CC1101_RXFIFO, packet->length);
-//      // Read RSSI
-//      packet->rssi = readConfigReg(CC1101_RXFIFO);
-//      // Read LQI and CRC_OK
-//      val = readConfigReg(CC1101_RXFIFO);
-//      packet->lqi = val & 0x7F;
-//      packet->crc_ok = (val & 0x80)>>7;// 8th or 7th bit //bitRead(val, 7);
-//    }
-//  }
-//  else
-//    packet->length = 0;
-//
-//  setIdleState();       // Enter IDLE state
-//  flushRxFifo();        // Flush Rx FIFO
-//  //CC1101_cmdStrobe(CC1101_SCAL);
-//  CC1101_cmdStrobe(CC1101_SRX);
-//
-//  // Back to RX state
-//  setRxState();
-//
-//  return packet->length;
 
-	  byte marcState;
 	  byte val;
 
 	  // Rx FIFO overflow?
-	  if (((marcState=readStatusReg(CC1101_MARCSTATE)) & 0x1F) == 0x11)
+	  if (((val=readStatusReg(CC1101_MARCSTATE)) & 0x1F) == 0x11)
 	  {
 	    setIdleState();       // Enter IDLE state
 	    flushRxFifo();        // Flush Rx FIFO
@@ -723,7 +607,6 @@ byte CC1101_receiveData(CCPACKET * packet)
 	    packet->length = 0;
 
 	  CC1101_cmdStrobe(CC1101_SRX);
-	  //while((marcState=readStatusReg(CC1101_MARCSTATE))==0x80)	; // loop while calibrating
 	  // Back to RX state
 	  setRxState();
 
