@@ -4,6 +4,7 @@ CC1101 driver for TMS320C6713 DSK
 CC1101 driver for C6713 DSK
 
 (Co)Author: Stefan Gvozdenovic
+gefa12 et gmail dot com
 Creation date: 05/19/2015
 
 Description: The Code is based on the panstamp CC1101 library for Arduino. This code
@@ -28,10 +29,13 @@ Basic current settings:
                 
 
 GPIOs that bit-bang SPI are defined in bitbang_spi.h header file.
-* SCK	GPIO_PIN13
-* MOSI	GPIO_PIN3
-* MISO	GPIO_PIN8
-* CS	GPIO_PIN0
-* GDO0	GPIO_PIN9
+* SCK	GPIO_13
+* MOSI	GPIO_3
+* MISO	GPIO_8
+* CS	GPIO_0
+* GDO0	GPIO_9
 
+More about J1 expansion header: [C6713 DSK Technical Reference](http://c6000.spectrumdigital.com/dsk6713/revc/files/6713_dsk_techref.pdf#page=28)
+
+More about the RF Transceiver Module RF1101SE pinout: [Erwan's blog](http://labalec.fr/erwan/?p=497)
 
