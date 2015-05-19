@@ -39,3 +39,5 @@ More about J1 expansion header: [C6713 DSK Technical Reference](http://c6000.spe
 
 More about the RF Transceiver Module RF1101SE pinout: [Erwan's blog](http://labalec.fr/erwan/?p=497)
 
+Note that in order for SPI to work GPIOs have to be functional therefore SWITCH 4 OF THE DIPSWITCH SW3 (NOT SW1!!!) HAS TO BE ON-CLOSED
+![picture alt](https://drive.google.com/file/d/0B09AKq-XVGSoVXBQcEtUSVc3Wm5uSFBxRURuTk56UFMwLVFJ/view?usp=sharing "Title is optional")
