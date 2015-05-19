@@ -30,3 +30,8 @@
 
 # Debug files
 *.dSYM/
+
+# CCS files
+*.cssproject
+*.cproject
+*.project
