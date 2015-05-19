@@ -18,20 +18,20 @@ CC1101 Sub-1GHz Transceiver
 Current radio settings for the radio can be found in the cc1101.h file. To change these 
 settings simply copy/paste the exported registers from smartRF studio.
 Basic current settings:
-                *Base frequency:     315MHz
-                *Modulation format:  GFSK
-                *Data rate:          50kBaud
-                *Deviation:          25kHz
-                *Channel number:     0
-                *Channel spacing:    200KHz
-                *TX power:           12dBm
+Base frequency:     315MHz
+Modulation format:  GFSK
+Data rate:          50kBaud
+Deviation:          25kHz
+Channel number:     0
+Channel spacing:    200KHz
+TX power:           12dBm
                 
 
 GPIOs that bit-bang SPI are defined in bitbang_spi.h header file.
-#define SCK		GPIO_PIN13
-#define MOSI		GPIO_PIN3
-#define MISO		GPIO_PIN8
-#define CS		GPIO_PIN0
-#define GDO0		GPIO_PIN9
+SCK	GPIO_PIN13
+MOSI	GPIO_PIN3
+MISO	GPIO_PIN8
+CS	GPIO_PIN0
+GDO0	GPIO_PIN9
 
 
