@@ -9,6 +9,11 @@
 #define GPIO_H_
 
 #endif /* GPIO_H_ */
+#define GPIO_0 0
+#define GPIO_2 1
+#define LED_1 2
+#define LED_2 3
+#define SPI_CHANNEL 0
 
 //gpio registers
 #define GPIO_ENABLE_ADDRESS		0x01B00000
@@ -28,3 +33,14 @@ void cc1101_Select();
 void cc1101_Deselect();
 void wait_GDO0_high();
 void wait_GDO0_low();
+//SPI interface
+void spiWriteReg(const unsigned char regAddr, const unsigned char regData);
+unsigned char spiReadReg (const unsigned char regAddr);
+
+void spiWriteAddr(const unsigned char regAddr);
+void spiWriteData(const unsigned char regData);
+unsigned char spiReadData ();
+void spiBurstWrite(const unsigned char regAddr,
+			const unsigned char data[], int len);
+void spiBurstRead(const unsigned char regAddr, unsigned char data[], int len);
+

@@ -325,7 +325,22 @@ enum RFSTATE
 #define PA_LowPower               0x60
 #define PA_LongDistance           0xC0
 
-void CC1101_init(void);
+struct cc1101_hw {
+	void (*spiWriteReg)(const unsigned char regAddr,
+			const unsigned char regData);
+	unsigned char (*spiReadReg)(const unsigned char regAddr);
+
+	void (*spiWriteAddr)(const unsigned char regAddr);
+	void (*spiBurstWrite)(const unsigned char regAddr,
+			const unsigned char data[], int len);
+	void (*spiWriteData)(const unsigned char regData);
+	unsigned char (*spiReadData)(void);
+	void (*wait_GDO0_high)(void);
+	void (*wait_GDO0_low)(void);
+	void (*spiBurstRead)(const unsigned char regAddr, unsigned char data[], int len);
+
+};
+void CC1101_init(struct cc1101_hw *hw);
 void CC1101_setSyncWord(byte *sync, boolean save);
 void CC1101_setDefaultRegs();
 void CC1101_setDevAddress(byte addr, boolean save);
@@ -333,5 +348,6 @@ void CC1101_setChannel(byte chnl, boolean save);
 void CC1101_setCarrierFreq(byte freq);
 boolean CC1101_sendData(CCPACKET packet);
 byte CC1101_receiveData(CCPACKET * packet);
+
 
 #endif

@@ -27,69 +27,67 @@
 
 #include "cc1101.h"
 #include "gpio.h"
-#include "bitbang_spi.h"
-#include <dsk6713.h>
-#include <csl_gpio.h>
+#include <stdio.h>
 
-extern GPIO_Handle    hGpio; /* GPIO handle */
+//extern GPIO_Handle    hGpio; /* GPIO handle */
+static struct cc1101_hw *hw;
 
 /**
  * Macros
  */
 // Select (SPI) CC1101
-#define cc1101_Select()  GPIO_pinWrite( hGpio, GPIO_PIN0, 0 )
+#define cc1101_Select()
 // Deselect (SPI) CC1101
-#define cc1101_Deselect()  GPIO_pinWrite( hGpio, GPIO_PIN0, 1 )
+#define cc1101_Deselect()
 // Wait until SPI MISO line goes low
-#define wait_Miso()  while(GPIO_pinRead( hGpio, GPIO_PIN8 ))
+#define wait_Miso()
 // Get GDO0 pin state
-#define getGDO0state()  bitRead(PORT_GDO0, BIT_GDO0)
+//#define getGDO0state()  bitRead(PORT_GDO0, BIT_GDO0)
 // Wait until GDO0 line goes high
-#define wait_GDO0_high() while(!GPIO_pinRead( hGpio, GPIO_PIN9 ))
+//#define wait_GDO0_high() while(!GPIO_pinRead( hGpio, GPIO_PIN9 ))
 // Wait until GDO0 line goes low
-#define wait_GDO0_low()  while(GPIO_pinRead( hGpio, GPIO_PIN9 ))
+//#define wait_GDO0_low()  while(GPIO_pinRead( hGpio, GPIO_PIN9 ))
 
 #define false 0
 #define true 1
 typedef char bool;
 
- /**
-  * PATABLE
-  */
-const byte paTable[8] = {0x60, 0x60, 0x60, 0x60, 0x60, 0x60, 0x60, 0x60};
+/**
+ * PATABLE
+ */
+const byte paTable[8] = { 0x60, 0x60, 0x60, 0x60, 0x60, 0x60, 0x60, 0x60 };
 
-struct CC1101
-{
-	    /*
-	     * RF state
-	     */
-	    byte rfState;
+struct CC1101 {
+	/*
+	 * RF state
+	 */
+	byte rfState;
 
-	    /**
-	     * Tx Power byte (single PATABLE config)
-	     */
-	    byte paTableByte;
+	/**
+	 * Tx Power byte (single PATABLE config)
+	 */
+	byte paTableByte;
 
-	    /**
-	     * Carrier frequency
-	     */
-	    byte carrierFreq;
+	/**
+	 * Carrier frequency
+	 */
+	byte carrierFreq;
 
-	    /**
-	     * Frequency channel
-	     */
-	    byte channel;
+	/**
+	 * Frequency channel
+	 */
+	byte channel;
 
-	    /**
-	     * Synchronization word
-	     */
-	    byte syncWord[2];
+	/**
+	 * Synchronization word
+	 */
+	byte syncWord[2];
 
-	    /**
-	     * Device address
-	     */
-	    byte devAddress;
-}CC1101;
+	/**
+	 * Device address
+	 */
+	byte devAddress;
+} CC1101;
 
 //------------------------------------------------------------------------------------
 /*		FUNCTION PROTOPYTES	(that are neccessary not to case any compiler errors)	*/
@@ -105,11 +103,10 @@ void CC1101_setCarrierFreq(byte freq);
  *
  * Wake up CC1101 from Power Down state
  */
-void CC1101_wakeUp(void)
-{
-  cc1101_Select();                      // Select CC1101
-  wait_Miso();                          // Wait until MISO goes low
-  cc1101_Deselect();                    // Deselect CC1101
+void CC1101_wakeUp(void) {
+	cc1101_Select();                      // Select CC1101
+	wait_Miso();                          // Wait until MISO goes low
+	cc1101_Deselect();                    // Deselect CC1101
 }
 
 /**
@@ -120,20 +117,8 @@ void CC1101_wakeUp(void)
  * 'regAddr'    Register address
  * 'value'      Value to be writen
  */
-void CC1101_writeReg(byte regAddr, byte value)
-{
-  cc1101_Select();                      // Select CC1101
-  wait_Miso();                          // Wait until MISO goes low
-
-//  // waits are needed since CSn is triggered by GPIO which is not in accordance with SPI peripheral which takes few cycles to shift out after you order it
-//  spi_send(regAddr);                    // Send register address
-//  DSK6713_waitusec(5);
-//  spi_send(value);                      // Send value
-//  DSK6713_waitusec(20);
-
-  spiWriteReg(regAddr, value);
-
-  cc1101_Deselect();                    // Deselect CC1101
+void CC1101_writeReg(byte regAddr, byte value) {
+	hw->spiWriteReg(regAddr, value);
 }
 
 /**
@@ -145,27 +130,11 @@ void CC1101_writeReg(byte regAddr, byte value)
  * 'buffer'     Data to be writen
  * 'len'        Data length
  */
-void CC1101_writeBurstReg(byte regAddr, byte* buffer, byte len)
-{
-  byte addr, i;
+void CC1101_writeBurstReg(byte regAddr, byte* buffer, byte len) {
+	byte addr, i;
 
-  addr = regAddr | WRITE_BURST;         // Enable burst transfer
-  cc1101_Select();                      // Select CC1101
-  wait_Miso();                          // Wait until MISO goes low
-  //spi_send(addr);                       // Send register address
-  spiWriteAddr(addr);
-  //DSK6713_waitusec(5);
-
-  for(i=0 ; i<len ; i++)
-  {
-    //spi_send(buffer[i]);                // Send value
-	  spiWriteData(buffer[i]);
-    //DSK6713_waitusec(10);
-  }
-
-  //DSK6713_waitusec(20);
-
-  cc1101_Deselect();                    // Deselect CC1101
+	addr = regAddr | WRITE_BURST;         // Enable burst transfer
+	hw->spiBurstWrite(regAddr, buffer, len);
 }
 
 /**
@@ -175,22 +144,9 @@ void CC1101_writeBurstReg(byte regAddr, byte* buffer, byte len)
  *
  * 'cmd'        Command strobe
  */
-void CC1101_cmdStrobe(byte cmd)
-{
-  cc1101_Select();                      // Select CC1101
-  wait_Miso();                          // Wait until MISO goes low
+void CC1101_cmdStrobe(byte cmd) {
+	hw->spiWriteReg(cmd, 0x00);	// basically we only need to send 1 byte
 
-//  spi_send(cmd);                        // Send strobe command
-//
-//  // send again, for some reason first send does not work
-//  DSK6713_waitusec(10);
-//  spi_send(cmd);                        // Send strobe command
-//
-//  DSK6713_waitusec(20);
-
-  spiWriteReg(cmd,0x00);	// basically we only need to send 1 byte
-
-  cc1101_Deselect();                    // Deselect CC1101
 }
 
 /**
@@ -204,32 +160,13 @@ void CC1101_cmdStrobe(byte cmd)
  * Return:
  *      Data byte returned by the CC1101 IC
  */
-byte CC1101_readReg(byte regAddr, byte regType)
-{
-  byte addr, val;
+byte CC1101_readReg(byte regAddr, byte regType) {
+	byte addr, val;
 
-  addr = regAddr | regType;
-  cc1101_Select();                      // Select CC1101
-  wait_Miso();                          // Wait until MISO goes low
+	addr = regAddr | regType;
+	val = hw->spiReadReg(addr);
 
-//  // have to do it twice for some reason, first read fails
-//  spi_send(addr);                       // Send register address
-//  //val = spi_send(addr);
-//  DSK6713_waitusec(5);
-//  //DSK6713_waitusec(25);
-//  val = spi_send(0x00);                 // Read result
-//  DSK6713_waitusec(20);
-//
-//  spi_send(addr);                       // Send register address
-//  DSK6713_waitusec(5);
-//  val = spi_send(0x00);                 // Read result
-//  DSK6713_waitusec(20);
-
-  val = spiReadReg(addr);
-
-  cc1101_Deselect();                    // Deselect CC1101
-
-  return val;
+	return val;
 }
 
 /**
@@ -241,27 +178,16 @@ byte CC1101_readReg(byte regAddr, byte regType)
  * 'regAddr'    Register address
  * 'len'        Data length
  */
-void CC1101_readBurstReg(byte * buffer, byte regAddr, byte len)
-{
-  byte addr, i;
+void CC1101_readBurstReg(byte * buffer, byte regAddr, byte len) {
+	byte addr, i;
+	addr = regAddr | READ_BURST;
+	hw->spiBurstRead(addr,buffer,len);
 
-  addr = regAddr | READ_BURST;
-  cc1101_Select();                      // Select CC1101
-  wait_Miso();                          // Wait until MISO goes low
-  //spi_send(addr);                       // Send register address
-  spiWriteAddr(addr);
-  //DSK6713_waitusec(5);
+//	for (i = 0; i < len; i++) {
+//		//buffer[i] = spi_send(0x00);         // Read result byte by byte
+//		buffer[i] = hw->spiReadData();         // Read result byte by byte
+//	}
 
-  for(i=0 ; i<len ; i++)
-  {
-    //buffer[i] = spi_send(0x00);         // Read result byte by byte
-	  buffer[i] = spiReadData();         // Read result byte by byte
-  	//DSK6713_waitusec(15);
-  }
-
-  //DSK6713_waitusec(20);
-
-  cc1101_Deselect();                    // Deselect CC1101
 }
 
 /**
@@ -269,25 +195,10 @@ void CC1101_readBurstReg(byte * buffer, byte regAddr, byte len)
  *
  * Reset CC1101
  */
-void CC1101_reset(void)
-{
-  cc1101_Deselect();                    // Deselect CC1101
-  DSK6713_waitusec(5);
-  cc1101_Select();                      // Select CC1101
-  DSK6713_waitusec(10);
-  cc1101_Deselect();                    // Deselect CC1101
-  DSK6713_waitusec(41);
-  cc1101_Select();                      // Select CC1101
+void CC1101_reset(void) {
+	hw->spiWriteReg(CC1101_SRES, 0x00);
 
-  wait_Miso();                          // Wait until MISO goes low
-  //spi_send(CC1101_SRES);                // Send reset command strobe
-  spiWriteReg(CC1101_SRES,0x00);
-  wait_Miso();                          // Wait until MISO goes low
-
-  cc1101_Deselect();                    // Deselect CC1101
-
-  CC1101_setDefaultRegs();                     // Reconfigure CC1101
-  //setRegsFromEeprom();                  // Take user settings from EEPROM
+	CC1101_setDefaultRegs();                     // Reconfigure CC1101
 }
 
 /**
@@ -295,63 +206,62 @@ void CC1101_reset(void)
  *
  * Configure CC1101 registers
  */
-void CC1101_setDefaultRegs()
-{
-  byte defSyncWrd[] = {CC1101_DEFVAL_SYNC1, CC1101_DEFVAL_SYNC0};
+void CC1101_setDefaultRegs() {
+	byte defSyncWrd[] = { CC1101_DEFVAL_SYNC1, CC1101_DEFVAL_SYNC0 };
 
-  CC1101_writeReg(CC1101_IOCFG2,  CC1101_DEFVAL_IOCFG2);
-  CC1101_writeReg(CC1101_IOCFG1,  CC1101_DEFVAL_IOCFG1);
-  CC1101_writeReg(CC1101_IOCFG0,  CC1101_DEFVAL_IOCFG0);
-  CC1101_writeReg(CC1101_FIFOTHR,  CC1101_DEFVAL_FIFOTHR);
-  CC1101_writeReg(CC1101_PKTLEN,  CC1101_DEFVAL_PKTLEN);
-  CC1101_writeReg(CC1101_PKTCTRL1,  CC1101_DEFVAL_PKTCTRL1);
-  CC1101_writeReg(CC1101_PKTCTRL0,  CC1101_DEFVAL_PKTCTRL0);
+	CC1101_writeReg(CC1101_IOCFG2, CC1101_DEFVAL_IOCFG2);
+	CC1101_writeReg(CC1101_IOCFG1, CC1101_DEFVAL_IOCFG1);
+	CC1101_writeReg(CC1101_IOCFG0, CC1101_DEFVAL_IOCFG0);
+	CC1101_writeReg(CC1101_FIFOTHR, CC1101_DEFVAL_FIFOTHR);
+	CC1101_writeReg(CC1101_PKTLEN, CC1101_DEFVAL_PKTLEN);
+	CC1101_writeReg(CC1101_PKTCTRL1, CC1101_DEFVAL_PKTCTRL1);
+	CC1101_writeReg(CC1101_PKTCTRL0, CC1101_DEFVAL_PKTCTRL0);
 
-  // Set default synchronization word
-  CC1101_setSyncWord(defSyncWrd, false);
+	// Set default synchronization word
+	CC1101_setSyncWord(defSyncWrd, false);
 
-  // Set default device address
-  CC1101_setDevAddress(CC1101_DEFVAL_ADDR, false);
-  // Set default frequency channel
-  CC1101_setChannel(CC1101_DEFVAL_CHANNR, false);
+	// Set default device address
+	CC1101_setDevAddress(CC1101_DEFVAL_ADDR, false);
+	// Set default frequency channel
+	CC1101_setChannel(CC1101_DEFVAL_CHANNR, false);
 
-  CC1101_writeReg(CC1101_FSCTRL1,  CC1101_DEFVAL_FSCTRL1);
-  CC1101_writeReg(CC1101_FSCTRL0,  CC1101_DEFVAL_FSCTRL0);
+	CC1101_writeReg(CC1101_FSCTRL1, CC1101_DEFVAL_FSCTRL1);
+	CC1101_writeReg(CC1101_FSCTRL0, CC1101_DEFVAL_FSCTRL0);
 
-  // Set default carrier frequency = 868 MHz
-  CC1101_setCarrierFreq(CFREQ_315);
+	// Set default carrier frequency = 868 MHz
+	CC1101_setCarrierFreq(CFREQ_315);
 
-  CC1101_writeReg(CC1101_MDMCFG4,  CC1101_DEFVAL_MDMCFG4);
-  CC1101_writeReg(CC1101_MDMCFG3,  CC1101_DEFVAL_MDMCFG3);
-  CC1101_writeReg(CC1101_MDMCFG2,  CC1101_DEFVAL_MDMCFG2);
-  CC1101_writeReg(CC1101_MDMCFG1,  CC1101_DEFVAL_MDMCFG1);
-  CC1101_writeReg(CC1101_MDMCFG0,  CC1101_DEFVAL_MDMCFG0);
-  CC1101_writeReg(CC1101_DEVIATN,  CC1101_DEFVAL_DEVIATN);
-  CC1101_writeReg(CC1101_MCSM2,  CC1101_DEFVAL_MCSM2);
-  CC1101_writeReg(CC1101_MCSM1,  CC1101_DEFVAL_MCSM1);
-  CC1101_writeReg(CC1101_MCSM0,  CC1101_DEFVAL_MCSM0);
-  CC1101_writeReg(CC1101_FOCCFG,  CC1101_DEFVAL_FOCCFG);
-  CC1101_writeReg(CC1101_BSCFG,  CC1101_DEFVAL_BSCFG);
-  CC1101_writeReg(CC1101_AGCCTRL2,  CC1101_DEFVAL_AGCCTRL2);
-  CC1101_writeReg(CC1101_AGCCTRL1,  CC1101_DEFVAL_AGCCTRL1);
-  CC1101_writeReg(CC1101_AGCCTRL0,  CC1101_DEFVAL_AGCCTRL0);
-  CC1101_writeReg(CC1101_WOREVT1,  CC1101_DEFVAL_WOREVT1);
-  CC1101_writeReg(CC1101_WOREVT0,  CC1101_DEFVAL_WOREVT0);
-  CC1101_writeReg(CC1101_WORCTRL,  CC1101_DEFVAL_WORCTRL);
-  CC1101_writeReg(CC1101_FREND1,  CC1101_DEFVAL_FREND1);
-  CC1101_writeReg(CC1101_FREND0,  CC1101_DEFVAL_FREND0);
-  CC1101_writeReg(CC1101_FSCAL3,  CC1101_DEFVAL_FSCAL3);
-  CC1101_writeReg(CC1101_FSCAL2,  CC1101_DEFVAL_FSCAL2);
-  CC1101_writeReg(CC1101_FSCAL1,  CC1101_DEFVAL_FSCAL1);
-  CC1101_writeReg(CC1101_FSCAL0,  CC1101_DEFVAL_FSCAL0);
-  CC1101_writeReg(CC1101_RCCTRL1,  CC1101_DEFVAL_RCCTRL1);
-  CC1101_writeReg(CC1101_RCCTRL0,  CC1101_DEFVAL_RCCTRL0);
-  CC1101_writeReg(CC1101_FSTEST,  CC1101_DEFVAL_FSTEST);
-  CC1101_writeReg(CC1101_PTEST,  CC1101_DEFVAL_PTEST);
-  CC1101_writeReg(CC1101_AGCTEST,  CC1101_DEFVAL_AGCTEST);
-  CC1101_writeReg(CC1101_TEST2,  CC1101_DEFVAL_TEST2);
-  CC1101_writeReg(CC1101_TEST1,  CC1101_DEFVAL_TEST1);
-  CC1101_writeReg(CC1101_TEST0,  CC1101_DEFVAL_TEST0);
+	CC1101_writeReg(CC1101_MDMCFG4, CC1101_DEFVAL_MDMCFG4);
+	CC1101_writeReg(CC1101_MDMCFG3, CC1101_DEFVAL_MDMCFG3);
+	CC1101_writeReg(CC1101_MDMCFG2, CC1101_DEFVAL_MDMCFG2);
+	CC1101_writeReg(CC1101_MDMCFG1, CC1101_DEFVAL_MDMCFG1);
+	CC1101_writeReg(CC1101_MDMCFG0, CC1101_DEFVAL_MDMCFG0);
+	CC1101_writeReg(CC1101_DEVIATN, CC1101_DEFVAL_DEVIATN);
+	CC1101_writeReg(CC1101_MCSM2, CC1101_DEFVAL_MCSM2);
+	CC1101_writeReg(CC1101_MCSM1, CC1101_DEFVAL_MCSM1);
+	CC1101_writeReg(CC1101_MCSM0, CC1101_DEFVAL_MCSM0);
+	CC1101_writeReg(CC1101_FOCCFG, CC1101_DEFVAL_FOCCFG);
+	CC1101_writeReg(CC1101_BSCFG, CC1101_DEFVAL_BSCFG);
+	CC1101_writeReg(CC1101_AGCCTRL2, CC1101_DEFVAL_AGCCTRL2);
+	CC1101_writeReg(CC1101_AGCCTRL1, CC1101_DEFVAL_AGCCTRL1);
+	CC1101_writeReg(CC1101_AGCCTRL0, CC1101_DEFVAL_AGCCTRL0);
+	CC1101_writeReg(CC1101_WOREVT1, CC1101_DEFVAL_WOREVT1);
+	CC1101_writeReg(CC1101_WOREVT0, CC1101_DEFVAL_WOREVT0);
+	CC1101_writeReg(CC1101_WORCTRL, CC1101_DEFVAL_WORCTRL);
+	CC1101_writeReg(CC1101_FREND1, CC1101_DEFVAL_FREND1);
+	CC1101_writeReg(CC1101_FREND0, CC1101_DEFVAL_FREND0);
+	CC1101_writeReg(CC1101_FSCAL3, CC1101_DEFVAL_FSCAL3);
+	CC1101_writeReg(CC1101_FSCAL2, CC1101_DEFVAL_FSCAL2);
+	CC1101_writeReg(CC1101_FSCAL1, CC1101_DEFVAL_FSCAL1);
+	CC1101_writeReg(CC1101_FSCAL0, CC1101_DEFVAL_FSCAL0);
+	CC1101_writeReg(CC1101_RCCTRL1, CC1101_DEFVAL_RCCTRL1);
+	CC1101_writeReg(CC1101_RCCTRL0, CC1101_DEFVAL_RCCTRL0);
+	CC1101_writeReg(CC1101_FSTEST, CC1101_DEFVAL_FSTEST);
+	CC1101_writeReg(CC1101_PTEST, CC1101_DEFVAL_PTEST);
+	CC1101_writeReg(CC1101_AGCTEST, CC1101_DEFVAL_AGCTEST);
+	CC1101_writeReg(CC1101_TEST2, CC1101_DEFVAL_TEST2);
+	CC1101_writeReg(CC1101_TEST1, CC1101_DEFVAL_TEST1);
+	CC1101_writeReg(CC1101_TEST0, CC1101_DEFVAL_TEST0);
 }
 
 /**
@@ -359,24 +269,24 @@ void CC1101_setDefaultRegs()
  *
  * Initialize CC1101
  */
-void CC1101_init(void)
-{
+void CC1101_init(struct cc1101_hw *cc1101_hw) {
+	hw = cc1101_hw;
+	printf("CC1101_init\n");
+	CC1101_reset();                              // Reset CC1101
+	// Configure PATABLE
+	hw->spiBurstWrite(CC1101_PATABLE, (byte*) paTable, 8);
+	//CC1101_writeReg(CC1101_PATABLE, CC1101.paTableByte);
 
-  CC1101_reset();                              // Reset CC1101
+	char read = CC1101_readReg(CC1101_PARTNUM, CC1101_STATUS_REGISTER);
+	read = CC1101_readReg(CC1101_VERSION, CC1101_STATUS_REGISTER);
+	read = CC1101_readReg(CC1101_MARCSTATE, CC1101_STATUS_REGISTER);
 
-  // Configure PATABLE
-  CC1101_writeBurstReg(CC1101_PATABLE, (byte*)paTable, 8);
-  //CC1101_writeReg(CC1101_PATABLE, CC1101.paTableByte);
+	//byte syncWord = 199;
+	//CC1101_setSyncWord(&syncWord, false);
+	CC1101_setCarrierFreq(CFREQ_433);
+	CC1101_disableAddressCheck();
 
-  char read = CC1101_readReg(CC1101_PARTNUM, CC1101_STATUS_REGISTER);
-  read = CC1101_readReg(CC1101_VERSION, CC1101_STATUS_REGISTER);
-  read = CC1101_readReg(CC1101_MARCSTATE, CC1101_STATUS_REGISTER);
-
-  //byte syncWord = 199;
-  //CC1101_setSyncWord(&syncWord, false);
-  CC1101_setCarrierFreq(CFREQ_315);
-  CC1101_disableAddressCheck();
-
+	printf("CC1101_init end\n");
 }
 
 /**
@@ -387,14 +297,13 @@ void CC1101_init(void)
  * 'sync'       Synchronization word
  * 'save' If TRUE, save parameter in EEPROM
  */
-void CC1101_setSyncWord(byte *sync, bool save)
-{
-  //if ((CC1101.syncWord[0] != sync[0]) || (CC1101.syncWord[1] != sync[1]))
-  {
-    CC1101_writeReg(CC1101_SYNC1, sync[0]);
-    CC1101_writeReg(CC1101_SYNC0, sync[1]);
-    // copy sync word into the struct
-    //memcpy(CC1101.syncWord, sync, sizeof(CC1101.syncWord));
+void CC1101_setSyncWord(byte *sync, bool save) {
+	//if ((CC1101.syncWord[0] != sync[0]) || (CC1101.syncWord[1] != sync[1]))
+	{
+		CC1101_writeReg(CC1101_SYNC1, sync[0]);
+		CC1101_writeReg(CC1101_SYNC0, sync[1]);
+		// copy sync word into the struct
+		//memcpy(CC1101.syncWord, sync, sizeof(CC1101.syncWord));
 
 //    // Save in EEPROM
 //    if (save)
@@ -402,7 +311,7 @@ void CC1101_setSyncWord(byte *sync, bool save)
 //      EEPROM.write(EEPROM_SYNC_WORD, sync[0]);
 //      EEPROM.write(EEPROM_SYNC_WORD + 1, sync[1]);
 //    }
-  }
+	}
 }
 
 /**
@@ -413,16 +322,15 @@ void CC1101_setSyncWord(byte *sync, bool save)
  * 'addr'       Device address
  * 'save' If TRUE, save parameter in EEPROM
  */
-void CC1101_setDevAddress(byte addr, bool save)
-{
-  //if (CC1101.devAddress != addr)
-  {
-    CC1101_writeReg(CC1101_ADDR, addr);
-    CC1101.devAddress = addr;
-    // Save in EEPROM
-    //if (save)
-    //  EEPROM.write(EEPROM_DEVICE_ADDR, addr);
-  }
+void CC1101_setDevAddress(byte addr, bool save) {
+	//if (CC1101.devAddress != addr)
+	{
+		CC1101_writeReg(CC1101_ADDR, addr);
+		CC1101.devAddress = addr;
+		// Save in EEPROM
+		//if (save)
+		//  EEPROM.write(EEPROM_DEVICE_ADDR, addr);
+	}
 }
 
 /**
@@ -433,16 +341,15 @@ void CC1101_setDevAddress(byte addr, bool save)
  * 'chnl'       Frequency channel
  * 'save' If TRUE, save parameter in EEPROM
  */
-void CC1101_setChannel(byte chnl, bool save)
-{
-  //if (CC1101.channel != chnl)
-  {
-    CC1101_writeReg(CC1101_CHANNR,  chnl);
-    CC1101.channel = chnl;
-    // Save in EEPROM
-    //if (save)
-    //  EEPROM.write(EEPROM_FREQ_CHANNEL, chnl);
-  }
+void CC1101_setChannel(byte chnl, bool save) {
+	//if (CC1101.channel != chnl)
+	{
+		CC1101_writeReg(CC1101_CHANNR, chnl);
+		CC1101.channel = chnl;
+		// Save in EEPROM
+		//if (save)
+		//  EEPROM.write(EEPROM_FREQ_CHANNEL, chnl);
+	}
 }
 
 /**
@@ -452,39 +359,36 @@ void CC1101_setChannel(byte chnl, bool save)
  *
  * 'freq'       New carrier frequency
  */
-void CC1101_setCarrierFreq(byte freq)
-{
-  switch(freq)
-  {
-    case CFREQ_915:
-      CC1101_writeReg(CC1101_FREQ2,  CC1101_DEFVAL_FREQ2_915);
-      CC1101_writeReg(CC1101_FREQ1,  CC1101_DEFVAL_FREQ1_915);
-      CC1101_writeReg(CC1101_FREQ0,  CC1101_DEFVAL_FREQ0_915);
-      break;
-    case CFREQ_433:
-      CC1101_writeReg(CC1101_FREQ2,  CC1101_DEFVAL_FREQ2_433);
-      CC1101_writeReg(CC1101_FREQ1,  CC1101_DEFVAL_FREQ1_433);
-      CC1101_writeReg(CC1101_FREQ0,  CC1101_DEFVAL_FREQ0_433);
-      break;
-    case CFREQ_315:
-      CC1101_writeReg(CC1101_FREQ2,  CC1101_DEFVAL_FREQ2_315);
-      CC1101_writeReg(CC1101_FREQ1,  CC1101_DEFVAL_FREQ1_315);
-      CC1101_writeReg(CC1101_FREQ0,  CC1101_DEFVAL_FREQ0_315);
-      break;
-    default:
-      CC1101_writeReg(CC1101_FREQ2,  CC1101_DEFVAL_FREQ2_868);
-      CC1101_writeReg(CC1101_FREQ1,  CC1101_DEFVAL_FREQ1_868);
-      CC1101_writeReg(CC1101_FREQ0,  CC1101_DEFVAL_FREQ0_868);
-      break;
-  }
+void CC1101_setCarrierFreq(byte freq) {
+	switch (freq) {
+	case CFREQ_915:
+		CC1101_writeReg(CC1101_FREQ2, CC1101_DEFVAL_FREQ2_915);
+		CC1101_writeReg(CC1101_FREQ1, CC1101_DEFVAL_FREQ1_915);
+		CC1101_writeReg(CC1101_FREQ0, CC1101_DEFVAL_FREQ0_915);
+		break;
+	case CFREQ_433:
+		CC1101_writeReg(CC1101_FREQ2, CC1101_DEFVAL_FREQ2_433);
+		CC1101_writeReg(CC1101_FREQ1, CC1101_DEFVAL_FREQ1_433);
+		CC1101_writeReg(CC1101_FREQ0, CC1101_DEFVAL_FREQ0_433);
+		break;
+	case CFREQ_315:
+		CC1101_writeReg(CC1101_FREQ2, CC1101_DEFVAL_FREQ2_315);
+		CC1101_writeReg(CC1101_FREQ1, CC1101_DEFVAL_FREQ1_315);
+		CC1101_writeReg(CC1101_FREQ0, CC1101_DEFVAL_FREQ0_315);
+		break;
+	default:
+		CC1101_writeReg(CC1101_FREQ2, CC1101_DEFVAL_FREQ2_868);
+		CC1101_writeReg(CC1101_FREQ1, CC1101_DEFVAL_FREQ1_868);
+		CC1101_writeReg(CC1101_FREQ0, CC1101_DEFVAL_FREQ0_868);
+		break;
+	}
 
-  CC1101_readReg(CC1101_FREQ2,  CC1101_CONFIG_REGISTER);
-  CC1101_readReg(CC1101_FREQ1,  CC1101_CONFIG_REGISTER);
-  CC1101_readReg(CC1101_FREQ0,  CC1101_CONFIG_REGISTER);
+	CC1101_readReg(CC1101_FREQ2, CC1101_CONFIG_REGISTER);
+	CC1101_readReg(CC1101_FREQ1, CC1101_CONFIG_REGISTER);
+	CC1101_readReg(CC1101_FREQ0, CC1101_CONFIG_REGISTER);
 
-  CC1101.carrierFreq = freq;
+	CC1101.carrierFreq = freq;
 }
-
 
 /**
  * sendData
@@ -497,67 +401,59 @@ void CC1101_setCarrierFreq(byte freq)
  *    True if the transmission succeeds
  *    False otherwise
  */
-boolean CC1101_sendData(CCPACKET packet)
-{
-  byte marcState;
+boolean CC1101_sendData(CCPACKET packet) {
+	byte marcState;
+	int count=0;
+	// Declare to be in Tx state. This will avoid receiving packets whilst
+	// transmitting
+	CC1101.rfState = RFSTATE_TX;
 
-  // Declare to be in Tx state. This will avoid receiving packets whilst
-  // transmitting
-  CC1101.rfState = RFSTATE_TX;
-
-  	// Enter RX state
+	// Enter RX state
 	setRxState();
+	// Check that the RX state has been entered
+	while (((marcState = readStatusReg(CC1101_MARCSTATE)) & 0x1F) != 0x0D) {
+		if (marcState == 0x11)        // RX_OVERFLOW
+			flushRxFifo();              // flush receive queue
 
-  // Check that the RX state has been entered
-  while (((marcState = readStatusReg(CC1101_MARCSTATE)) & 0x1F) != 0x0D)
-  {
-	  DSK6713_waitusec(1000);
+		if (marcState == 0x16)        // TX_UNDERFLOW
+			flushTxFifo();              // flush receive queue
+		if(count++ > 1000){
+			return false;
+		}
+	}
+	// Set data length at the first position of the TX FIFO
+	CC1101_writeReg(CC1101_TXFIFO, packet.length);
+	// Write data into the TX FIFO
+	CC1101_writeBurstReg(CC1101_TXFIFO, packet.data, packet.length);
 
-    if (marcState == 0x11)        // RX_OVERFLOW
-      flushRxFifo();              // flush receive queue
+	// CCA enabled: will enter TX state only if the channel is clear
+	CC1101_cmdStrobe(CC1101_STX);
+	setTxState();
 
-    if (marcState == 0x16)        // TX_UNDERFLOW
-      flushTxFifo();              // flush receive queue
-  }
-  DSK6713_waitusec(500);
+	// Check that TX state is being entered (state = RXTX_SETTLING)
+	marcState = readStatusReg(CC1101_MARCSTATE) & 0x1F;
 
-  // Set data length at the first position of the TX FIFO
-  CC1101_writeReg(CC1101_TXFIFO,  packet.length);
-  // Write data into the TX FIFO
-  CC1101_writeBurstReg(CC1101_TXFIFO, packet.data, packet.length);
+	if ((marcState != 0x13) && (marcState != 0x14) && (marcState != 0x15)) {
+		setIdleState();       // Enter IDLE state
+		flushTxFifo();        // Flush Tx FIFO
+		setRxState();         // Back to RX state
 
+		// Declare to be in Rx state
+		CC1101.rfState = RFSTATE_RX;
+		return false;
+	}
 
-  // CCA enabled: will enter TX state only if the channel is clear
-  CC1101_cmdStrobe(CC1101_STX);
-  setTxState();
+	// Wait for the sync word to be transmitted
+	hw->wait_GDO0_high();
 
+	// Wait until the end of the packet transmission
+	hw->wait_GDO0_low();
 
-  // Check that TX state is being entered (state = RXTX_SETTLING)
-  marcState = readStatusReg(CC1101_MARCSTATE) & 0x1F;
+	// Check that the TX FIFO is empty
+	if ((readStatusReg(CC1101_TXBYTES) & 0x7F) == 0)
+		return true;
 
-
-  if((marcState != 0x13) && (marcState != 0x14) && (marcState != 0x15))
-  {
-    setIdleState();       // Enter IDLE state
-    flushTxFifo();        // Flush Tx FIFO
-    setRxState();         // Back to RX state
-
-    // Declare to be in Rx state
-    CC1101.rfState = RFSTATE_RX;
-    return false;
-  }
-
-  // Wait for the sync word to be transmitted
-  wait_GDO0_high();
-
-  // Wait until the end of the packet transmission
-  wait_GDO0_low();
-
-  // Check that the TX FIFO is empty
-  if((readStatusReg(CC1101_TXBYTES) & 0x7F) == 0)
-    return true;
-
-  return false;
+	return false;
 }
 
 /**
@@ -570,45 +466,47 @@ boolean CC1101_sendData(CCPACKET packet)
  * Return:
  *      Amount of bytes received
  */
-byte CC1101_receiveData(CCPACKET * packet)
-{
+byte CC1101_receiveData(CCPACKET * packet) {
 
-	  byte val;
+//	printf("1");
 
-	  // Rx FIFO overflow?
-	  if (((val=readStatusReg(CC1101_MARCSTATE)) & 0x1F) == 0x11)
-	  {
-	    setIdleState();       // Enter IDLE state
-	    flushRxFifo();        // Flush Rx FIFO
-	    //CC1101_cmdStrobe(CC1101_SFSTXON);
-	    packet->length = 0;
-	  }
-	  // Any byte waiting to be read?
-	  else if ((val=readStatusReg(CC1101_RXBYTES)) & 0x7F)
-	  {
-	    // Read data length
-	    packet->length = readConfigReg(CC1101_RXFIFO);
-	    // If packet is too long
-	    if (packet->length > CC1101_DATA_LEN)
-	      packet->length = 0;   // Discard packet
-	    else
-	    {
-	      // Read data packet
-	      CC1101_readBurstReg(packet->data, CC1101_RXFIFO, packet->length);
-	      // Read RSSI
-	      packet->rssi = readConfigReg(CC1101_RXFIFO);
-	      // Read LQI and CRC_OK
-	      val = readConfigReg(CC1101_RXFIFO);
-	      packet->lqi = val & 0x7F;
-	      packet->crc_ok = (val & 0x80)>>7;
-	    }
-	  }
-	  else
-	    packet->length = 0;
+	byte val;
 
-	  CC1101_cmdStrobe(CC1101_SRX);
-	  // Back to RX state
-	  setRxState();
+	// Rx FIFO overflow?
+	if (((val = readStatusReg(CC1101_MARCSTATE)) & 0x1F) == 0x11) {
+//		printf("2");
+		setIdleState();       // Enter IDLE state
+		flushRxFifo();        // Flush Rx FIFO
+		//CC1101_cmdStrobe(CC1101_SFSTXON);
+		packet->length = 0;
+	}
+	// Any byte waiting to be read?
+	else if ((val = readStatusReg(CC1101_RXBYTES)) & 0x7F) {
+//		printf("3");
+		// Read data length
+		packet->length = readConfigReg(CC1101_RXFIFO);
+		// If packet is too long
+		if (packet->length > CC1101_DATA_LEN)
+			packet->length = 0;   // Discard packet
+		else {
+			// Read data packet
+			printf("BURST READ\n");
+			CC1101_readBurstReg(packet->data, CC1101_RXFIFO, packet->length);
+			// Read RSSI
+			packet->rssi = readConfigReg(CC1101_RXFIFO);
+			// Read LQI and CRC_OK
+			val = readConfigReg(CC1101_RXFIFO);
+			packet->lqi = val & 0x7F;
+			packet->crc_ok = (val & 0x80) >> 7;
+		}
+	}
+	else {
+		packet->length = 0;
+	}
 
-	  return packet->length;
+	CC1101_cmdStrobe(CC1101_SRX);
+	// Back to RX state
+	setRxState();
+
+	return packet->length;
 }
