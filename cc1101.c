@@ -26,8 +26,8 @@
  */
 
 #include "cc1101.h"
-#include "gpio.h"
 #include <stdio.h>
+#include "cc1101_gpio.h"
 
 //extern GPIO_Handle    hGpio; /* GPIO handle */
 static struct cc1101_hw *hw;
@@ -229,7 +229,7 @@ void CC1101_setDefaultRegs() {
 	CC1101_writeReg(CC1101_FSCTRL0, CC1101_DEFVAL_FSCTRL0);
 
 	// Set default carrier frequency = 868 MHz
-	CC1101_setCarrierFreq(CFREQ_315);
+	CC1101_setCarrierFreq(CFREQ_433);
 
 	CC1101_writeReg(CC1101_MDMCFG4, CC1101_DEFVAL_MDMCFG4);
 	CC1101_writeReg(CC1101_MDMCFG3, CC1101_DEFVAL_MDMCFG3);
@@ -271,7 +271,6 @@ void CC1101_setDefaultRegs() {
  */
 void CC1101_init(struct cc1101_hw *cc1101_hw) {
 	hw = cc1101_hw;
-	printf("CC1101_init\n");
 	CC1101_reset();                              // Reset CC1101
 	// Configure PATABLE
 	hw->spiBurstWrite(CC1101_PATABLE, (byte*) paTable, 8);
@@ -286,7 +285,6 @@ void CC1101_init(struct cc1101_hw *cc1101_hw) {
 	CC1101_setCarrierFreq(CFREQ_433);
 	CC1101_disableAddressCheck();
 
-	printf("CC1101_init end\n");
 }
 
 /**
@@ -490,7 +488,6 @@ byte CC1101_receiveData(CCPACKET * packet) {
 			packet->length = 0;   // Discard packet
 		else {
 			// Read data packet
-			printf("BURST READ\n");
 			CC1101_readBurstReg(packet->data, CC1101_RXFIFO, packet->length);
 			// Read RSSI
 			packet->rssi = readConfigReg(CC1101_RXFIFO);
