@@ -354,5 +354,7 @@ void CC1101_setChannel(byte chnl, boolean save);
 void CC1101_setCarrierFreq(byte freq);
 boolean CC1101_sendData(CCPACKET packet);
 byte CC1101_receiveData(CCPACKET * packet);
+boolean CC1101_rx_mode(void);
+
 
 #endif
