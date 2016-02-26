@@ -36,7 +36,7 @@ void wait_GDO0_low();
 //SPI interface
 void spiWriteReg(const unsigned char regAddr, const unsigned char regData);
 unsigned char spiReadReg (const unsigned char regAddr);
-
+unsigned char spiReadRegData (const unsigned char regAddr);
 void spiWriteAddr(const unsigned char regAddr);
 void spiWriteData(const unsigned char regData);
 unsigned char spiReadData ();

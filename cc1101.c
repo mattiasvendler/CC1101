@@ -28,6 +28,7 @@
 #include "cc1101.h"
 #include <stdio.h>
 #include "cc1101_gpio.h"
+#include <debug.h>
 
 //extern GPIO_Handle    hGpio; /* GPIO handle */
 static struct cc1101_hw *hw;
@@ -145,7 +146,7 @@ void CC1101_writeBurstReg(byte regAddr, byte* buffer, byte len) {
  * 'cmd'        Command strobe
  */
 void CC1101_cmdStrobe(byte cmd) {
-	hw->spiWriteReg(cmd, 0x00);	// basically we only need to send 1 byte
+	hw->spiBurstWrite(cmd,NULL,0);	// basically we only need to send 1 byte
 
 }
 
@@ -168,7 +169,14 @@ byte CC1101_readReg(byte regAddr, byte regType) {
 
 	return val;
 }
+byte CC1101_readRegData(byte regAddr, byte regType) {
+	byte addr, val;
 
+	addr = regAddr | regType;
+	val = hw->spiReadRegData(addr);
+
+	return val;
+}
 /**
  * readBurstReg
  *
@@ -182,12 +190,6 @@ void CC1101_readBurstReg(byte * buffer, byte regAddr, byte len) {
 	byte addr, i;
 	addr = regAddr | READ_BURST;
 	hw->spiBurstRead(addr,buffer,len);
-
-//	for (i = 0; i < len; i++) {
-//		//buffer[i] = spi_send(0x00);         // Read result byte by byte
-//		buffer[i] = hw->spiReadData();         // Read result byte by byte
-//	}
-
 }
 
 /**
@@ -209,11 +211,11 @@ void CC1101_reset(void) {
 void CC1101_setDefaultRegs() {
 	byte defSyncWrd[] = { CC1101_DEFVAL_SYNC1, CC1101_DEFVAL_SYNC0 };
 
-	CC1101_writeReg(CC1101_IOCFG2, CC1101_DEFVAL_IOCFG2);
+	CC1101_writeReg(CC1101_IOCFG2, 0x0E);
 	CC1101_writeReg(CC1101_IOCFG1, CC1101_DEFVAL_IOCFG1);
 	CC1101_writeReg(CC1101_IOCFG0, CC1101_DEFVAL_IOCFG0);
 	CC1101_writeReg(CC1101_FIFOTHR, CC1101_DEFVAL_FIFOTHR);
-	CC1101_writeReg(CC1101_PKTLEN, CC1101_DEFVAL_PKTLEN);
+	CC1101_writeReg(CC1101_PKTLEN, 0x3D);
 	CC1101_writeReg(CC1101_PKTCTRL1, CC1101_DEFVAL_PKTCTRL1);
 	CC1101_writeReg(CC1101_PKTCTRL0, CC1101_DEFVAL_PKTCTRL0);
 
@@ -238,7 +240,7 @@ void CC1101_setDefaultRegs() {
 	CC1101_writeReg(CC1101_MDMCFG0, CC1101_DEFVAL_MDMCFG0);
 	CC1101_writeReg(CC1101_DEVIATN, CC1101_DEFVAL_DEVIATN);
 	CC1101_writeReg(CC1101_MCSM2, CC1101_DEFVAL_MCSM2);
-	CC1101_writeReg(CC1101_MCSM1, CC1101_DEFVAL_MCSM1);
+	CC1101_writeReg(CC1101_MCSM1, 0x2C);
 	CC1101_writeReg(CC1101_MCSM0, CC1101_DEFVAL_MCSM0);
 	CC1101_writeReg(CC1101_FOCCFG, CC1101_DEFVAL_FOCCFG);
 	CC1101_writeReg(CC1101_BSCFG, CC1101_DEFVAL_BSCFG);
@@ -271,7 +273,9 @@ void CC1101_setDefaultRegs() {
  */
 void CC1101_init(struct cc1101_hw *cc1101_hw) {
 	hw = cc1101_hw;
-	CC1101_reset();                              // Reset CC1101
+	CC1101_reset();
+	CC1101_writeReg(CC1101_PKTLEN,0x3D);
+// Reset CC1101
 	// Configure PATABLE
 	hw->spiBurstWrite(CC1101_PATABLE, (byte*) paTable, 8);
 	//CC1101_writeReg(CC1101_PATABLE, CC1101.paTableByte);
@@ -284,6 +288,7 @@ void CC1101_init(struct cc1101_hw *cc1101_hw) {
 	//CC1101_setSyncWord(&syncWord, false);
 	CC1101_setCarrierFreq(CFREQ_433);
 	CC1101_disableAddressCheck();
+	setIdleState();
 
 }
 
@@ -325,9 +330,6 @@ void CC1101_setDevAddress(byte addr, bool save) {
 	{
 		CC1101_writeReg(CC1101_ADDR, addr);
 		CC1101.devAddress = addr;
-		// Save in EEPROM
-		//if (save)
-		//  EEPROM.write(EEPROM_DEVICE_ADDR, addr);
 	}
 }
 
@@ -466,27 +468,28 @@ boolean CC1101_sendData(CCPACKET packet) {
  */
 byte CC1101_receiveData(CCPACKET * packet) {
 
-//	printf("1");
 
 	byte val;
 
 	// Rx FIFO overflow?
 	if (((val = readStatusReg(CC1101_MARCSTATE)) & 0x1F) == 0x11) {
-//		printf("2");
 		setIdleState();       // Enter IDLE state
 		flushRxFifo();        // Flush Rx FIFO
 		//CC1101_cmdStrobe(CC1101_SFSTXON);
 		packet->length = 0;
+		dbg_printf("Rx FIFO overflow\n");
 	}
 	// Any byte waiting to be read?
-	else if ((val = readStatusReg(CC1101_RXBYTES)) & 0x7F) {
-//		printf("3");
-		// Read data length
-		packet->length = readConfigReg(CC1101_RXFIFO);
+
+	// Read data length
+	else if ((packet->length = readConfigReg(CC1101_RXFIFO)) ) {
 		// If packet is too long
-		if (packet->length > CC1101_DATA_LEN)
+		if (packet->length > CC1101_DATA_LEN) {
+			dbg_printf("Discard packet\n");
+			flushRxFifo();
+			setRxState();
 			packet->length = 0;   // Discard packet
-		else {
+		} else {
 			// Read data packet
 			CC1101_readBurstReg(packet->data, CC1101_RXFIFO, packet->length);
 			// Read RSSI
@@ -494,13 +497,15 @@ byte CC1101_receiveData(CCPACKET * packet) {
 			// Read LQI and CRC_OK
 			val = readConfigReg(CC1101_RXFIFO);
 			packet->lqi = val & 0x7F;
-			packet->crc_ok = (val & 0x80) >> 7;
+			packet->crc_ok = (val & 0x80);
 		}
 	}
 	else {
 		packet->length = 0;
 	}
-
+	if(!packet->crc_ok){
+		flushRxFifo();
+	}
 	CC1101_cmdStrobe(CC1101_SRX);
 	// Back to RX state
 	setRxState();

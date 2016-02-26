@@ -30,7 +30,7 @@
 #define _CC1101_H
 
 #include "ccpacket.h"
-
+#include <types.h>
 //typedef char byte;
 //typedef char boolean;
 
@@ -235,15 +235,15 @@ enum RFSTATE
  * or when the radio enters RXFIFO_OVERFLOW state. In TX the pin will de-assert if the TX FIFO underflows
  * Settings optimized for low current consumption
  */
-#define CC1101_DEFVAL_IOCFG2     0x29        // GDO2 Output Pin Configuration
+#define CC1101_DEFVAL_IOCFG2     0x06        // GDO2 Output Pin Configuration
 #define CC1101_DEFVAL_IOCFG1     0x2E        // GDO1 Output Pin Configuration
 #define CC1101_DEFVAL_IOCFG0     0x06        // GDO0 Output Pin Configuration
 #define CC1101_DEFVAL_FIFOTHR    0x07        // RX FIFO and TX FIFO Thresholds
 #define CC1101_DEFVAL_SYNC1      0xB5        // Synchronization word, high byte
 #define CC1101_DEFVAL_SYNC0      0x47        // Synchronization word, low byte
-#define CC1101_DEFVAL_PKTLEN     0xFF        // Packet Length
-#define CC1101_DEFVAL_PKTCTRL1   0x06        // Packet Automation Control
-#define CC1101_DEFVAL_PKTCTRL0   0x05        // Packet Automation Control
+#define CC1101_DEFVAL_PKTLEN     0x40        // Packet Length
+#define CC1101_DEFVAL_PKTCTRL1   0x0C        // Packet Automation Control
+#define CC1101_DEFVAL_PKTCTRL0   0x41        // Packet Automation Control
 #define CC1101_DEFVAL_ADDR       0xFF        // Device Address
 #define CC1101_DEFVAL_CHANNR     0x00        // Channel Number
 #define CC1101_DEFVAL_FSCTRL1    0x08        // Frequency Synthesizer Control
@@ -298,7 +298,7 @@ enum RFSTATE
  * Macros
  */
 // Read CC1101 Config register
-#define readConfigReg(regAddr)    CC1101_readReg(regAddr, CC1101_CONFIG_REGISTER)
+#define readConfigReg(regAddr)    CC1101_readRegData(regAddr, CC1101_CONFIG_REGISTER)
 // Read CC1101 Status register
 #define readStatusReg(regAddr)    CC1101_readReg(regAddr, CC1101_STATUS_REGISTER)
 // Enter Rx state
@@ -312,7 +312,7 @@ enum RFSTATE
 // Flush Tx FIFO
 #define flushTxFifo()             CC1101_cmdStrobe(CC1101_SFTX)
 // Disable address check
-#define CC1101_disableAddressCheck()     CC1101_writeReg(CC1101_PKTCTRL1, 0x04)
+#define CC1101_disableAddressCheck()     CC1101_writeReg(CC1101_PKTCTRL1, 0x0C)
 // Enable address check
 #define enableAddressCheck()      CC1101_writeReg(CC1101_PKTCTRL1, 0x06)
 // Disable CCA
@@ -325,6 +325,9 @@ enum RFSTATE
 #define PA_LowPower               0x60
 #define PA_LongDistance           0xC0
 
+//enum cc1101_state{
+//
+//};
 struct cc1101_hw {
 	void (*spiWriteReg)(const unsigned char regAddr,
 			const unsigned char regData);
@@ -338,6 +341,9 @@ struct cc1101_hw {
 	void (*wait_GDO0_high)(void);
 	void (*wait_GDO0_low)(void);
 	void (*spiBurstRead)(const unsigned char regAddr, unsigned char data[], int len);
+	void *userdata;
+	void (*packet_data_input)(u8_t len, u8_t *data,void *userdata);
+	unsigned char (*spiReadRegData) (const unsigned char regAddr);
 
 };
 void CC1101_init(struct cc1101_hw *hw);
@@ -348,4 +354,5 @@ void CC1101_setChannel(byte chnl, boolean save);
 void CC1101_setCarrierFreq(byte freq);
 boolean CC1101_sendData(CCPACKET packet);
 byte CC1101_receiveData(CCPACKET * packet);
+
 #endif
