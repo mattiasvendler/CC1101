@@ -74,8 +74,15 @@ static void *statemachine(void *arg) {
 void radio_send(unsigned char *buffer, int len,
 		void (*radio_send_done_fn)(unsigned int res, void *userdata),
 		void *userdata) {
+//	printf("Paket len %d\n",len);
+//	int i;
+//	for(i=0;i<len;i++){
+//		printf("%02X",buffer[i]);
+//	}
+//	printf("\n");
 	struct packet_queue *pq = malloc(sizeof(struct packet_queue));
 	memset(pq, 0, sizeof(struct packet_queue));
+
 	memcpy(&pq->packet.data[0], buffer, len);
 	pq->packet.length = len;
 	pq->userdata = userdata;
@@ -89,7 +96,9 @@ void radio_send(unsigned char *buffer, int len,
 	}
 }
 void radio_notify() {
-	radio_mgr.state = RADIO_STATE_RX;
+	if (radio_mgr.state == RADIO_STATE_IDLE) {
+		radio_mgr.state = RADIO_STATE_RX;
+	}
 }
 static void radio_mgr_timer_cb(void) {
 	radio_fn();

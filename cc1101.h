@@ -30,7 +30,6 @@
 #define _CC1101_H
 
 #include "ccpacket.h"
-#include <types.h>
 //typedef char byte;
 //typedef char boolean;
 
@@ -81,7 +80,7 @@ enum RFSTATE
 #define CC1101_PATABLE           0x3E        // PATABLE address
 #define CC1101_TXFIFO            0x3F        // TX FIFO address
 #define CC1101_RXFIFO            0x3F        // RX FIFO address
-
+#define CC1101_TXFIFO_BURST		 0x7F		 // TX FIFO burst write
 /**
  * Command strobes
  */
@@ -342,7 +341,7 @@ struct cc1101_hw {
 	void (*wait_GDO0_low)(void);
 	void (*spiBurstRead)(const unsigned char regAddr, unsigned char data[], int len);
 	void *userdata;
-	void (*packet_data_input)(u8_t len, u8_t *data,void *userdata);
+	void (*packet_data_input)(unsigned char len, unsigned char *data,void *userdata);
 	unsigned char (*spiReadRegData) (const unsigned char regAddr);
 
 };

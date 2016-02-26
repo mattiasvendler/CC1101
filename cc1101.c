@@ -28,7 +28,6 @@
 #include "cc1101.h"
 #include <stdio.h>
 #include "cc1101_gpio.h"
-#include <debug.h>
 
 //extern GPIO_Handle    hGpio; /* GPIO handle */
 static struct cc1101_hw *hw;
@@ -137,6 +136,12 @@ void CC1101_writeBurstReg(byte regAddr, byte* buffer, byte len) {
 	addr = regAddr | WRITE_BURST;         // Enable burst transfer
 	hw->spiBurstWrite(regAddr, buffer, len);
 }
+void CC1101_writeBurstTXFIFO(byte regAddr, byte* buffer, byte len) {
+	byte addr;
+
+	addr = regAddr;         // Enable burst transfer
+	hw->spiBurstWrite(regAddr, buffer, len);
+}
 
 /**
  * cmdStrobe
@@ -147,7 +152,6 @@ void CC1101_writeBurstReg(byte regAddr, byte* buffer, byte len) {
  */
 void CC1101_cmdStrobe(byte cmd) {
 	hw->spiBurstWrite(cmd,NULL,0);	// basically we only need to send 1 byte
-
 }
 
 /**
@@ -409,26 +413,23 @@ boolean CC1101_sendData(CCPACKET packet) {
 	CC1101.rfState = RFSTATE_TX;
 
 	// Enter RX state
-	setRxState();
-	// Check that the RX state has been entered
-	while (((marcState = readStatusReg(CC1101_MARCSTATE)) & 0x1F) != 0x0D) {
-		if (marcState == 0x11)        // RX_OVERFLOW
-			flushRxFifo();              // flush receive queue
-
-		if (marcState == 0x16)        // TX_UNDERFLOW
-			flushTxFifo();              // flush receive queue
-		if(count++ > 1000){
-			return false;
-		}
-	}
+//	setRxState();
+//	// Check that the RX state has been entered
+//	while (((marcState = readStatusReg(CC1101_MARCSTATE)) & 0x1F) != 0x0D) {
+//		if (marcState == 0x11)        // RX_OVERFLOW
+//			flushRxFifo();              // flush receive queue
+//
+//		if (marcState == 0x16)        // TX_UNDERFLOW
+//			flushTxFifo();              // flush receive queue
+//
+//	}
 	// Set data length at the first position of the TX FIFO
+
+	setTxState();
 	CC1101_writeReg(CC1101_TXFIFO, packet.length);
 	// Write data into the TX FIFO
-	CC1101_writeBurstReg(CC1101_TXFIFO, packet.data, packet.length);
-
+	CC1101_writeBurstTXFIFO(CC1101_TXFIFO_BURST, packet.data, packet.length);
 	// CCA enabled: will enter TX state only if the channel is clear
-	CC1101_cmdStrobe(CC1101_STX);
-	setTxState();
 
 	// Check that TX state is being entered (state = RXTX_SETTLING)
 	marcState = readStatusReg(CC1101_MARCSTATE) & 0x1F;
@@ -448,11 +449,10 @@ boolean CC1101_sendData(CCPACKET packet) {
 
 	// Wait until the end of the packet transmission
 	hw->wait_GDO0_low();
-
 	// Check that the TX FIFO is empty
-	if ((readStatusReg(CC1101_TXBYTES) & 0x7F) == 0)
+	if ((readStatusReg(CC1101_TXBYTES) & 0x7F) == 0){
 		return true;
-
+	}
 	return false;
 }
 
@@ -477,7 +477,6 @@ byte CC1101_receiveData(CCPACKET * packet) {
 		flushRxFifo();        // Flush Rx FIFO
 		//CC1101_cmdStrobe(CC1101_SFSTXON);
 		packet->length = 0;
-		dbg_printf("Rx FIFO overflow\n");
 	}
 	// Any byte waiting to be read?
 
@@ -485,7 +484,6 @@ byte CC1101_receiveData(CCPACKET * packet) {
 	else if ((packet->length = readConfigReg(CC1101_RXFIFO)) ) {
 		// If packet is too long
 		if (packet->length > CC1101_DATA_LEN) {
-			dbg_printf("Discard packet\n");
 			flushRxFifo();
 			setRxState();
 			packet->length = 0;   // Discard packet
