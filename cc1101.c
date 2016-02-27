@@ -407,7 +407,6 @@ void CC1101_setCarrierFreq(byte freq) {
  */
 boolean CC1101_sendData(CCPACKET packet) {
 	byte marcState;
-	int count=0;
 	// Declare to be in Tx state. This will avoid receiving packets whilst
 	// transmitting
 	CC1101.rfState = RFSTATE_TX;
@@ -445,17 +444,37 @@ boolean CC1101_sendData(CCPACKET packet) {
 	}
 
 	// Wait for the sync word to be transmitted
-	hw->wait_GDO0_high();
-
-	// Wait until the end of the packet transmission
-	hw->wait_GDO0_low();
+//	hw->wait_GDO0_high();
+//
+//	// Wait until the end of the packet transmission
+//	hw->wait_GDO0_low();
 	// Check that the TX FIFO is empty
+	return true;
+}
+boolean CC1101_tx_fifo_empty(void){
 	if ((readStatusReg(CC1101_TXBYTES) & 0x7F) == 0){
 		return true;
 	}
 	return false;
-}
 
+}
+boolean CC1101_rx_mode(void){
+	byte marcState;
+
+	// Enter RX state
+	setRxState();
+	// Check that the RX state has been entered
+	while (((marcState = readStatusReg(CC1101_MARCSTATE)) & 0x1F) != 0x0D) {
+		if (marcState == 0x11)        // RX_OVERFLOW
+			flushRxFifo();              // flush receive queue
+
+		if (marcState == 0x16)        // TX_UNDERFLOW
+			flushTxFifo();              // flush receive queue
+
+		return false;
+	}
+	return true;
+}
 /**
  * receiveData
  *
