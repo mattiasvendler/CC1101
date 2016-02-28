@@ -34,71 +34,76 @@ struct packet_queue {
 };
 
 static struct packet_queue *queue;
-static void *statemachine(void *arg) {
+
+static void statemachine(struct radio_mgr *mgr){
+	switch (mgr->state) {
+	case RADIO_STATE_INIT: {
+		int i;
+		for (i = 0; i < 20; i++) {
+			packet.data[i] = i + 1;
+		}
+		packet.length = 20;
+		queue = NULL;
+		mgr->state = RADIO_STATE_IDLE;
+		break;
+	}
+	case RADIO_STATE_IDLE:
+		if(!(packet_flags & RX_ENTERED) ){
+			DBG("%s\n",state[mgr->state]);
+			if (CC1101_rx_mode())
+				packet_flags |= RX_ENTERED;
+			packet_flags &= (SENDING | PACKET_SENT_OK);
+		}
+		if (queue) {
+//				DBG("RADIO_STATE_IDLE\n");
+			packet_flags &= ~RX_ENTERED;
+			mgr->state = RADIO_STATE_TX;
+		}
+		break;
+	case RADIO_STATE_RX:
+		DBG("%s\n",state[mgr->state]);
+		if (CC1101_receiveData(&in_packet)) {
+			DBG("Len:%d\nLQI %d\n RSSI %d\n", in_packet.length,
+					in_packet.lqi, in_packet.rssi);
+			radio_mgr.state = RADIO_STATE_IDLE;
+		}
+		break;
+	case RADIO_STATE_TX: {
+		DBG("%s\n",state[mgr->state]);
+		if(!(packet_flags & SENDING) ){
+//				DBG("SEND START\n");
+			packet_flags&=!RX_ENTERED;
+			current_packet = queue;
+			if(!CC1101_sendData(current_packet->packet)){
+				radio_mgr.state=RADIO_STATE_IDLE;
+			}else{
+//					DBG("WAIT FOR INTERRUPT\n");
+				packet_flags|=SENDING;
+			}
+			queue = current_packet->next;
+		} else if (packet_flags & PACKET_SENT_OK) {
+
+
+			if (current_packet->radio_send_done_fn) {
+				current_packet->radio_send_done_fn(CC1101_tx_fifo_empty(),
+						current_packet->userdata);
+			}
+			mgr->state = RADIO_STATE_IDLE;
+			free(current_packet);
+			packet_flags &= !SENDING;
+		}
+
+		break;
+	}
+	}
+
+}
+
+static void *radio_mgr_thread(void *arg) {
 	struct radio_mgr *mgr = (struct radio_mgr *) arg;
 	while (1) {
 
-		switch (mgr->state) {
-		case RADIO_STATE_INIT: {
-			int i;
-			for (i = 0; i < 20; i++) {
-				packet.data[i] = i + 1;
-			}
-			packet.length = 20;
-			queue = NULL;
-			mgr->state = RADIO_STATE_IDLE;
-			break;
-		}
-		case RADIO_STATE_IDLE:
-			if(!(packet_flags & RX_ENTERED) ){
-				printf("%s\n",state[mgr->state]);
-				if (CC1101_rx_mode())
-					packet_flags |= RX_ENTERED;
-				packet_flags &= (SENDING | PACKET_SENT_OK);
-			}
-			if (queue) {
-//				printf("RADIO_STATE_IDLE\n");
-				packet_flags &= ~RX_ENTERED;
-				mgr->state = RADIO_STATE_TX;
-			}
-			break;
-		case RADIO_STATE_RX:
-			printf("%s\n",state[mgr->state]);
-			if (CC1101_receiveData(&in_packet)) {
-				printf("Len:%d\nLQI %d\n RSSI %d\n", in_packet.length,
-						in_packet.lqi, in_packet.rssi);
-				radio_mgr.state = RADIO_STATE_IDLE;
-			}
-			break;
-		case RADIO_STATE_TX: {
-			printf("%s\n",state[mgr->state]);
-			if(!(packet_flags & SENDING) ){
-//				printf("SEND START\n");
-				packet_flags&=!RX_ENTERED;
-				current_packet = queue;
-				if(!CC1101_sendData(current_packet->packet)){
-					radio_mgr.state=RADIO_STATE_IDLE;
-				}else{
-//					printf("WAIT FOR INTERRUPT\n");
-					packet_flags|=SENDING;
-				}
-				queue = current_packet->next;
-			} else if (packet_flags & PACKET_SENT_OK) {
-
-
-				if (current_packet->radio_send_done_fn) {
-					current_packet->radio_send_done_fn(CC1101_tx_fifo_empty(),
-							current_packet->userdata);
-				}
-				mgr->state = RADIO_STATE_IDLE;
-				free(current_packet);
-				packet_flags &= !SENDING;
-			}
-
-			break;
-		}
-		}
-
+		statemachine(mgr);
 		const struct timespec ts = { 0, 1000000 };
 		struct timespec rem;
 		sched_yield();
@@ -110,12 +115,12 @@ static void *statemachine(void *arg) {
 void radio_send(unsigned char *buffer, int len,
 		void (*radio_send_done_fn)(unsigned int res, void *userdata),
 		void *userdata) {
-//	printf("Paket len %d\n",len);
+//	DBG("Paket len %d\n",len);
 //	int i;
 //	for(i=0;i<len;i++){
-//		printf("%02X",buffer[i]);
+//		DBG("%02X",buffer[i]);
 //	}
-//	printf("\n");
+//	DBG("\n");
 	struct packet_queue *pq = malloc(sizeof(struct packet_queue));
 	memset(pq, 0, sizeof(struct packet_queue));
 
@@ -137,7 +142,7 @@ void radio_notify() {
 	}else if(radio_mgr.state==RADIO_STATE_IDLE){
 		radio_mgr.state=RADIO_STATE_RX;
 	}else{
-		printf("MISSED \n");
+		DBG("MISSED \n");
 	}
 }
 static void radio_mgr_timer_cb(void) {
@@ -146,7 +151,7 @@ static void radio_mgr_timer_cb(void) {
 void radio_init() {
 	radio_mgr.state = RADIO_STATE_IDLE;
 	timer_add_callback(radio_mgr_timer_cb);
-	int res = pthread_create(&t, NULL, statemachine, (void *) &radio_mgr);
+	int res = pthread_create(&t, NULL, radio_mgr_thread, (void *) &radio_mgr);
 
 	if (res != 0) {
 		perror(NULL);

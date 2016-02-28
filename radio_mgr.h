@@ -9,6 +9,12 @@
 #define CC1101_RADIO_MGR_H_
 
 #include <cc1101.h>
+#ifdef LINUX
+#define DBG printf
+#else
+#include <debug.h>
+#define DBG dbg_printf
+#endif
 enum radio_state{
 	RADIO_STATE_INIT,
 	RADIO_STATE_IDLE,
