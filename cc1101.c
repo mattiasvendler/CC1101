@@ -244,7 +244,7 @@ void CC1101_setDefaultRegs() {
 	CC1101_writeReg(CC1101_MDMCFG0, CC1101_DEFVAL_MDMCFG0);
 	CC1101_writeReg(CC1101_DEVIATN, CC1101_DEFVAL_DEVIATN);
 	CC1101_writeReg(CC1101_MCSM2, CC1101_DEFVAL_MCSM2);
-	CC1101_writeReg(CC1101_MCSM1, 0x2C);
+	CC1101_writeReg(CC1101_MCSM1, CC1101_DEFVAL_MCSM1);
 	CC1101_writeReg(CC1101_MCSM0, CC1101_DEFVAL_MCSM0);
 	CC1101_writeReg(CC1101_FOCCFG, CC1101_DEFVAL_FOCCFG);
 	CC1101_writeReg(CC1101_BSCFG, CC1101_DEFVAL_BSCFG);
@@ -424,11 +424,11 @@ boolean CC1101_sendData(CCPACKET packet) {
 //	}
 	// Set data length at the first position of the TX FIFO
 
-	setTxState();
 	CC1101_writeReg(CC1101_TXFIFO, packet.length);
 	// Write data into the TX FIFO
 	CC1101_writeBurstTXFIFO(CC1101_TXFIFO_BURST, packet.data, packet.length);
 	// CCA enabled: will enter TX state only if the channel is clear
+	setTxState();
 
 	// Check that TX state is being entered (state = RXTX_SETTLING)
 	marcState = readStatusReg(CC1101_MARCSTATE) & 0x1F;

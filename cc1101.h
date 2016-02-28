@@ -323,6 +323,7 @@ enum RFSTATE
 // PATABLE values
 #define PA_LowPower               0x60
 #define PA_LongDistance           0xC0
+#define getMarcState readStatusReg(CC1101_MARCSTATE)
 
 //enum cc1101_state{
 //
