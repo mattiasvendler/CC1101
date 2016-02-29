@@ -259,7 +259,7 @@ enum RFSTATE
 #define CC1101_DEFVAL_DEVIATN    0x35        // Modem Deviation Setting
 #define CC1101_DEFVAL_MCSM2      0x07        // Main Radio Control State Machine Configuration
 //#define CC1101_DEFVAL_MCSM1      0x30        // Main Radio Control State Machine Configuration
-#define CC1101_DEFVAL_MCSM1      0x20        // Main Radio Control State Machine Configuration
+#define CC1101_DEFVAL_MCSM1      0x00        // Main Radio Control State Machine Configuration
 #define CC1101_DEFVAL_MCSM0      0x18        // Main Radio Control State Machine Configuration
 #define CC1101_DEFVAL_FOCCFG     0x16        // Frequency Offset Compensation Configuration
 #define CC1101_DEFVAL_BSCFG      0x6C        // Bit Synchronization Configuration
@@ -324,6 +324,7 @@ enum RFSTATE
 #define PA_LowPower               0x60
 #define PA_LongDistance           0xC0
 #define getMarcState readStatusReg(CC1101_MARCSTATE)
+#define resetRadio() CC1101_cmdStrobe(CC1101_STX)
 
 //enum cc1101_state{
 //
