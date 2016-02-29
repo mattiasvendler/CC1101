@@ -176,8 +176,8 @@ enum RFSTATE
  */
 // Carrier frequency = 433 MHz
 #define CC1101_DEFVAL_FREQ2_433  0x10        // Frequency Control Word, High Byte
-#define CC1101_DEFVAL_FREQ1_433  0xA7        // Frequency Control Word, Middle Byte
-#define CC1101_DEFVAL_FREQ0_433  0x62        // Frequency Control Word, Low Byte
+#define CC1101_DEFVAL_FREQ1_433  0xB1        // Frequency Control Word, Middle Byte
+#define CC1101_DEFVAL_FREQ0_433  0x3B        // Frequency Control Word, Low Byte
 // Carrier frequency = 315 MHz
 #define CC1101_DEFVAL_FREQ2_315  0x0C        // Frequency Control Word, High Byte
 #define CC1101_DEFVAL_FREQ1_315  0x1D        // Frequency Control Word, Middle Byte
