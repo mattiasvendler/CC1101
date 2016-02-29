@@ -30,8 +30,12 @@ static unsigned int packet_flags = 0;
 #define RX_ENTERED 0x03
 #define RADIO_RESET 0x04
 struct cc1101_hw cc1101_hw;
+#ifndef LINUX
 extern int init_stuff;
 #define RESET_TIME_IN_STATE mgr->time_in_state = 0
+#else
+#define RESET_TIME_IN_STATE
+#endif
 static const char *state[] = { "RADIO_STATE_INIT", "RADIO_STATE_RESET",
 		"RADIO_STATE_IDLE", "RADIO_STATE_RX", "RADIO_STATE_TX" };
 struct packet_queue {
@@ -55,7 +59,9 @@ void radio_state_machine(struct radio_mgr *mgr) {
 		queue = NULL;
 		packet_flags &= ~RADIO_RESET;
 		RESET_TIME_IN_STATE;
+#ifndef LINUX
 		init_stuff = 1;
+#endif
 //		setIdleState();
 		mgr->state = RADIO_STATE_IDLE;
 		DBG("%s\n", state[mgr->state]);
@@ -66,7 +72,9 @@ void radio_state_machine(struct radio_mgr *mgr) {
 			packet_flags |= RADIO_RESET;
 			DBG("%s\n", state[mgr->state]);
 			DBG("RESET radio1\n");
+#ifndef LINUX
 			init_stuff = 0;
+#endif
 			CC1101_init(&cc1101_hw);
 			DBG("RESET radio2\n");
 			RESET_TIME_IN_STATE;
@@ -98,7 +106,7 @@ void radio_state_machine(struct radio_mgr *mgr) {
 		if (CC1101_receiveData(&in_packet)) {
 			DBG("Len:%d\nLQI %d\n RSSI %d SEQUENCE %d\n", in_packet.length,
 					in_packet.lqi, in_packet.rssi, in_packet.data[0]);
-		radio_send(in_packet.data,in_packet.length,NULL,NULL);
+//		radio_send(in_packet.data,in_packet.length,NULL,NULL);
 	}
 	RESET_TIME_IN_STATE;
 	packet_flags &= ~RX_ENTERED;
