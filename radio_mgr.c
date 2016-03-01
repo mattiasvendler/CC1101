@@ -79,17 +79,17 @@ void radio_state_machine(struct radio_mgr *mgr) {
 		break;
 	case RADIO_STATE_IDLE:
 		if (!(packet_flags & RX_ENTERED)) {
-			if (CC1101_rx_mode()) {
-				DBG("RX entered\n");
 				packet_flags |= RX_ENTERED;
-			} else if (mgr->time_in_state > 1000) {
-				RESET_TIME_IN_STATE;
-				setIdleState();
-				packet_flags &= ~RX_ENTERED;
-
-//				mgr->state = RADIO_STATE_RESET;
-			}
-			packet_flags &= (SENDING | PACKET_SENT_OK);
+//			if (CC1101_rx_mode()) {
+//				DBG("RX entered\n");
+//			} else if (mgr->time_in_state > 1000) {
+//				RESET_TIME_IN_STATE;
+//				setIdleState();
+//				packet_flags &= ~RX_ENTERED;
+//
+////				mgr->state = RADIO_STATE_RESET;
+//			}
+			packet_flags &= ~(SENDING | PACKET_SENT_OK);
 		}
 		if (queue) {
 			packet_flags &= ~RX_ENTERED;
@@ -206,7 +206,9 @@ void radio_send(unsigned char *buffer, int len,
 void radio_notify() {
 	if (radio_mgr.state == RADIO_STATE_TX && (packet_flags & SENDING)) {
 		packet_flags |= PACKET_SENT_OK;
+		DBG("PACKET_SENT_OK\n");
 	} else if (radio_mgr.state == RADIO_STATE_IDLE) {
+		DBG("PACKET RECIEVED\n");
 		radio_mgr.state = RADIO_STATE_RX;
 	} else {
 		DBG("MISSED \n");
