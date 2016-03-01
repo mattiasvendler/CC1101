@@ -22,6 +22,7 @@ static pthread_t t;
 #define NULL (void *)0;
 #endif
 static CCPACKET in_packet;
+static CCPACKET ack_packet = {.length=1,.data={0xAA},.crc_ok=0,.rssi=0,.lqi=0};
 static struct packet_queue *current_packet;
 static unsigned int packet_flags = 0;
 #define PACKET_SENT_OK 0x01
@@ -77,18 +78,21 @@ void radio_state_machine(struct radio_mgr *mgr) {
 		}
 		break;
 	case RADIO_STATE_IDLE:
-		if (!(packet_flags & RX_ENTERED) && mgr->time_in_state>100) {
+		if (!(packet_flags & RX_ENTERED)) {
 			if (CC1101_rx_mode()) {
 				DBG("RX entered\n");
 				packet_flags |= RX_ENTERED;
 			} else if (mgr->time_in_state > 1000) {
 				RESET_TIME_IN_STATE;
-				mgr->state = RADIO_STATE_RESET;
+				setIdleState();
+//				mgr->state = RADIO_STATE_RESET;
 			}
 			packet_flags &= (SENDING | PACKET_SENT_OK);
 		}
 		if (queue) {
 			packet_flags &= ~RX_ENTERED;
+			packet_flags &= ~SENDING;
+
 			RESET_TIME_IN_STATE;
 			mgr->state = RADIO_STATE_TX;
 		}
@@ -98,7 +102,7 @@ void radio_state_machine(struct radio_mgr *mgr) {
 			DBG("Len:%d\nLQI %d\n RSSI %d SEQUENCE %d\n", in_packet.length,
 					in_packet.lqi, in_packet.rssi, in_packet.data[0]);
 #ifndef LINUX
-		radio_send(in_packet.data,in_packet.length,NULL,NULL);
+		radio_send(ack_packet.data,ack_packet.length,NULL,NULL);
 #endif
 	}
 	RESET_TIME_IN_STATE;
@@ -109,7 +113,7 @@ void radio_state_machine(struct radio_mgr *mgr) {
 case RADIO_STATE_TX: {
 	if (!(packet_flags & SENDING)) {
 		DBG("%s\n", state[mgr->state]);
-		DBG("SEND START\n");
+//		DBG("SEND START\n");
 		packet_flags &= !RX_ENTERED;
 		current_packet = queue;
 		if (!CC1101_sendData(current_packet->packet)) {
@@ -117,7 +121,7 @@ case RADIO_STATE_TX: {
 			DBG("SEND FAILED1\n");
 			radio_mgr.state = RADIO_STATE_IDLE;
 		} else {
-			DBG("WAIT FOR INTERRUPT\n");
+//			DBG("WAIT FOR INTERRUPT\n");
 			packet_flags |= SENDING;
 			RESET_TIME_IN_STATE;
 		}
@@ -129,8 +133,8 @@ case RADIO_STATE_TX: {
 					(readStatusReg(CC1101_TXBYTES) & 0x7F),
 					current_packet->packet.length);
 		} else {
-			DBG("SEND OK size %d %d\n", (readStatusReg(CC1101_TXBYTES) & 0x7F),
-					current_packet->packet.length);
+//			DBG("SEND OK size %d %d\n", (readStatusReg(CC1101_TXBYTES) & 0x7F),
+//					current_packet->packet.length);
 		}
 		if (current_packet->radio_send_done_fn) {
 			current_packet->radio_send_done_fn(tx_fifo_empty,
@@ -142,7 +146,6 @@ case RADIO_STATE_TX: {
 		free(current_packet);
 		packet_flags &= !SENDING;
 	} else if ((packet_flags & SENDING) && mgr->time_in_state > 500) {
-		packet_flags &= !SENDING;
 		setIdleState();
 		DBG("TX TIMEOUT\n");
 		free(current_packet);
