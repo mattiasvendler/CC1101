@@ -85,6 +85,8 @@ void radio_state_machine(struct radio_mgr *mgr) {
 			} else if (mgr->time_in_state > 1000) {
 				RESET_TIME_IN_STATE;
 				setIdleState();
+				packet_flags &= ~RX_ENTERED;
+
 //				mgr->state = RADIO_STATE_RESET;
 			}
 			packet_flags &= (SENDING | PACKET_SENT_OK);
@@ -98,12 +100,15 @@ void radio_state_machine(struct radio_mgr *mgr) {
 		}
 		break;
 	case RADIO_STATE_RX:
+		DBG("%s\n", state[mgr->state]);
 		if (CC1101_receiveData(&in_packet)) {
 			DBG("Len:%d\nLQI %d\n RSSI %d SEQUENCE %d\n", in_packet.length,
 					in_packet.lqi, in_packet.rssi, in_packet.data[0]);
 #ifndef LINUX
 		radio_send(ack_packet.data,ack_packet.length,NULL,NULL);
 #endif
+	}else{
+		DBG("RX failed len %d, rssi %d lqi %d\n",in_packet.length,in_packet.rssi,in_packet.rssi);
 	}
 	RESET_TIME_IN_STATE;
 	packet_flags &= ~RX_ENTERED;
