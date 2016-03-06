@@ -33,18 +33,37 @@ struct cc1101_hw cc1101_hw;
 extern int init_stuff;
 #endif
 #define RESET_TIME_IN_STATE mgr->time_in_state = 0
-static const char *state[] = { "RADIO_STATE_INIT", "RADIO_STATE_RESET",
-		"RADIO_STATE_IDLE", "RADIO_STATE_RX", "RADIO_STATE_TX" };
-struct packet_queue {
-	CCPACKET packet;
-	void *userdata;
-	void (*radio_send_done_fn)(unsigned int res, void *userdata);
-	struct packet_queue *next;
-};
 
+static struct packet_queue packet_buff[PACKET_BUF_SIZE];
+static unsigned char packet_used[PACKET_BUF_SIZE];
 static struct packet_queue *queue;
 
+static const char *state[] = { "RADIO_STATE_INIT", "RADIO_STATE_RESET",
+		"RADIO_STATE_IDLE", "RADIO_STATE_RX", "RADIO_STATE_TX" };
 
+
+static struct packet_queue * alloc_packet(){
+	struct packet_queue *q = NULL;
+	unsigned char i;
+	for(i=0;i<PACKET_BUF_SIZE;i++){
+		if(packet_used[i] == 0){
+			packet_used[i]=1;
+			q=&packet_buff[i];
+			return q;
+		}
+	}
+	return q;
+}
+
+static void packet_free(struct packet_queue *q){
+	unsigned char i;
+	for(i=0;i<PACKET_BUF_SIZE;i++){
+		if(&packet_buff[i] == q){
+			packet_used[i]=0;
+//			memset(&packet_buff[i],0,sizeof(struct packet_queue));
+		}
+	}
+}
 
 void radio_state_machine(struct radio_mgr *mgr) {
 	switch (mgr->state) {
@@ -134,7 +153,7 @@ case RADIO_STATE_TX: {
 			RESET_TIME_IN_STATE;
 			DBG("SEND FAILED1\n");
 			radio_mgr.state = RADIO_STATE_IDLE;
-			free(current_packet);
+			packet_free(current_packet);
 			break;
 		} else {
 			packet_flags |= SENDING;
@@ -155,13 +174,13 @@ case RADIO_STATE_TX: {
 		RESET_TIME_IN_STATE;
 		setIdleState();
 		mgr->state = RADIO_STATE_IDLE;
-		free(current_packet);
+		packet_free(current_packet);
 		packet_flags &= !SENDING;
 	} else if ((packet_flags & SENDING) && mgr->time_in_state > 100) {
 		flushTxFifo();
 		setIdleState();
 		DBG("TX TIMEOUT\n");
-		free(current_packet);
+		packet_free(current_packet);
 		RESET_TIME_IN_STATE;
 		packet_flags &= !SENDING;
 
@@ -191,9 +210,10 @@ static void *radio_mgr_thread(void *arg) {
 void radio_send(unsigned char *buffer, int len,
 		void (*radio_send_done_fn)(unsigned int res, void *userdata),
 		void *userdata) {
-	struct packet_queue *pq = malloc(sizeof(struct packet_queue));
+	struct packet_queue *pq = alloc_packet();
 	if(!pq){
 		DBG("Malloc failed\n");
+		return;
 	}
 	memset(pq, 0, sizeof(struct packet_queue));
 
@@ -201,8 +221,8 @@ void radio_send(unsigned char *buffer, int len,
 	pq->packet.length = len;
 	pq->userdata = userdata;
 	pq->radio_send_done_fn = radio_send_done_fn;
-	pq->next = NULL
-	;
+	pq->next = NULL;
+
 	if (queue) {
 		queue->next = pq;
 		queue = pq;
@@ -226,6 +246,7 @@ static void radio_mgr_timer_cb(void) {
 }
 void radio_init() {
 	radio_mgr.state = RADIO_STATE_INIT;
+	memset(&packet_used,0,PACKET_BUF_SIZE);
 
 #ifdef LINUX
 	timer_add_callback(radio_mgr_timer_cb);
