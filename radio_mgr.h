@@ -25,6 +25,8 @@ enum radio_state{
 struct radio_mgr{
 	enum radio_state state;
 	unsigned short time_in_state;
+	void *userdata;
+	void (*data_recieved)(unsigned char *data,unsigned char len,unsigned char rssi, unsigned char lqi,void *userdata);
 };
 void radio_state_machine(struct radio_mgr *mgr);
 void radio_notify();

@@ -415,15 +415,16 @@ boolean CC1101_sendData(CCPACKET packet) {
 
 	// Enter RX state
 //	setRxState();
-//	// Check that the RX state has been entered
-//	while (((marcState = readStatusReg(CC1101_MARCSTATE)) & 0x1F) != 0x0D) {
-//		if (marcState == 0x11)        // RX_OVERFLOW
-//			flushRxFifo();              // flush receive queue
-//
-//		if (marcState == 0x16)        // TX_UNDERFLOW
-//			flushTxFifo();              // flush receive queue
-//
-//	}
+	// Check that the RX state has been entered
+	marcState = readStatusReg(CC1101_MARCSTATE) & 0x1F;
+	if (marcState == 0x11)        // RX_OVERFLOW
+		flushRxFifo();              // flush receive queue
+
+	if (marcState == 0x16)        // TX_UNDERFLOW
+		flushTxFifo();              // flush receive queue
+
+
+
 	// Set data length at the first position of the TX FIFO
 
 	CC1101_writeReg(CC1101_TXFIFO, packet.length);
@@ -489,9 +490,7 @@ boolean CC1101_rx_mode(void){
  */
 byte CC1101_receiveData(CCPACKET * packet) {
 
-
 	byte val;
-
 	// Rx FIFO overflow?
 	if (((val = readStatusReg(CC1101_MARCSTATE)) & 0x1F) == 0x11) {
 		setIdleState();       // Enter IDLE state
@@ -500,9 +499,9 @@ byte CC1101_receiveData(CCPACKET * packet) {
 		packet->length = 0;
 	}
 	// Any byte waiting to be read?
-
 	// Read data length
 	else if ((packet->length = readConfigReg(CC1101_RXFIFO)) ) {
+
 		// If packet is too long
 		if (packet->length > CC1101_DATA_LEN) {
 			flushRxFifo();
