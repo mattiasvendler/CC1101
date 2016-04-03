@@ -15,7 +15,9 @@
 #include <debug.h>
 #define DBG dbg_printf
 #endif
+#ifndef PACKET_BUF_SIZE
 #define PACKET_BUF_SIZE 5
+#endif
 enum radio_state{
 	RADIO_STATE_INIT,
 	RADIO_STATE_RESET,
@@ -39,8 +41,8 @@ struct radio_mgr{
 	void (*data_recieved)(unsigned char *data,unsigned char len,unsigned char rssi, unsigned char lqi,void *userdata);
 };
 void radio_state_machine(struct radio_mgr *mgr);
-void radio_notify();
+void radio_notify(void);
 void radio_send(unsigned char *buffer,int len,void (*radio_send_done_fn)(unsigned int res,void *userdata),void *userdata);
-void radio_init();
-void radio_fn();
+void radio_init(void);
+void radio_fn(void);
 #endif /* CC1101_RADIO_MGR_H_ */

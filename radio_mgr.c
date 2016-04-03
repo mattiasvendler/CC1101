@@ -8,11 +8,11 @@
 #ifdef LINUX
 #include <timer.h>
 #include <pthread.h>
-#include <string.h>
 #include <stdio.h>
 #include <errno.h>
 #include <stdlib.h>
 #endif
+#include <string.h>
 #include <cc1101.h>
 struct radio_mgr radio_mgr;
 #ifdef LINUX
@@ -38,11 +38,11 @@ static struct packet_queue packet_buff[PACKET_BUF_SIZE];
 static unsigned char packet_used[PACKET_BUF_SIZE];
 static struct packet_queue *queue;
 
-static const char *state[] = { "RADIO_STATE_INIT", "RADIO_STATE_RESET",
-		"RADIO_STATE_IDLE", "RADIO_STATE_RX", "RADIO_STATE_TX" };
+//static const char *state[] = { "RADIO_STATE_INIT", "RADIO_STATE_RESET",
+//		"RADIO_STATE_IDLE", "RADIO_STATE_RX", "RADIO_STATE_TX" };
 
 
-static struct packet_queue * alloc_packet(){
+static struct packet_queue * alloc_packet(void){
 	struct packet_queue *q = NULL;
 	unsigned char i;
 	for(i=0;i<PACKET_BUF_SIZE;i++){
@@ -60,7 +60,7 @@ static void packet_free(struct packet_queue *q){
 	for(i=0;i<PACKET_BUF_SIZE;i++){
 		if(&packet_buff[i] == q){
 			packet_used[i]=0;
-//			memset(&packet_buff[i],0,sizeof(struct packet_queue));
+			memset(&packet_buff[i],0,sizeof(struct packet_queue));
 		}
 	}
 }
@@ -77,19 +77,19 @@ void radio_state_machine(struct radio_mgr *mgr) {
 #endif
 //		setIdleState();
 		mgr->state = RADIO_STATE_IDLE;
-		DBG("%s\n", state[mgr->state]);
+//		DBG("%s\n", state[mgr->state]);
 		break;
 	}
 	case RADIO_STATE_RESET:
 		if (!(packet_flags & RADIO_RESET)) {
 			packet_flags |= RADIO_RESET;
-			DBG("%s\n", state[mgr->state]);
-			DBG("RESET radio1\n");
+//			DBG("%s\n", state[mgr->state]);
+//			DBG("RESET radio1\n");
 #ifndef LINUX
 			init_stuff = 0;
 #endif
 			CC1101_init(&cc1101_hw);
-			DBG("RESET radio2\n");
+//			DBG("RESET radio2\n");
 			RESET_TIME_IN_STATE;
 
 			mgr->state = RADIO_STATE_IDLE;
@@ -120,15 +120,15 @@ void radio_state_machine(struct radio_mgr *mgr) {
 //		DBG("Len:%d\nLQI %d\nRSSI %d\nSEQUENCE %d\n", in_packet.length,
 //				 in_packet.rssi,in_packet.lqi, in_packet.data[0]);
 			if (mgr->data_recieved) {
-				mgr->data_recieved(&in_packet.data[0], in_packet.length,
-						in_packet.rssi, in_packet.lqi, mgr->userdata);
+				mgr->data_recieved((unsigned char *)&in_packet.data[0], (unsigned char) in_packet.length,
+						(unsigned char )in_packet.rssi, (unsigned char )in_packet.lqi, mgr->userdata);
 			}
 #ifndef LINUX
 //			radio_send(&in_packet.data[0],in_packet.length,NULL,NULL);
 #endif
 
 	} else {
-		DBG("RX failed\n");
+//		DBG("RX failed\n");
 	}
 	RESET_TIME_IN_STATE;
 	packet_flags &= ~RX_ENTERED;
@@ -143,12 +143,12 @@ case RADIO_STATE_TX: {
 		if(current_packet == NULL)
 		{
 			RESET_TIME_IN_STATE;
-			DBG("SEND FAILED1\n");
+//			DBG("SEND FAILED1\n");
 			radio_mgr.state = RADIO_STATE_IDLE;
 			break;
 
 		}
-		DBG("CC1101 send ...");
+//		DBG("CC1101 send ...");
 		if (!CC1101_sendData(current_packet->packet)) {
 			RESET_TIME_IN_STATE;
 			DBG("SEND FAILED1\n");
@@ -162,10 +162,10 @@ case RADIO_STATE_TX: {
 	} else if (packet_flags & PACKET_SENT_OK) {
 		boolean tx_fifo_empty = CC1101_tx_fifo_empty();
 		if (!tx_fifo_empty) {
-			flushTxFifo();
 			DBG("SEND FAILED2 size %d %d\n",
 					(readStatusReg(CC1101_TXBYTES) & 0x7F),
 					current_packet->packet.length);
+			flushTxFifo();
 		}
 		if (current_packet->radio_send_done_fn) {
 			current_packet->radio_send_done_fn(tx_fifo_empty,
@@ -179,7 +179,7 @@ case RADIO_STATE_TX: {
 	} else if ((packet_flags & SENDING) && mgr->time_in_state > 100) {
 		flushTxFifo();
 		setIdleState();
-		DBG("TX TIMEOUT\n");
+//		DBG("TX TIMEOUT\n");
 		packet_free(current_packet);
 		RESET_TIME_IN_STATE;
 		packet_flags &= !SENDING;
@@ -233,17 +233,18 @@ void radio_send(unsigned char *buffer, int len,
 void radio_notify() {
 	if (radio_mgr.state == RADIO_STATE_TX && (packet_flags & SENDING)) {
 		packet_flags |= PACKET_SENT_OK;
-		DBG("CC1101 sent ok\n");
 	} else if (radio_mgr.state == RADIO_STATE_IDLE) {
-		DBG("CC1101 recive ok\n");
+//		DBG("CC1101 recive ok\n");
 		radio_mgr.state = RADIO_STATE_RX;
 	} else {
-		DBG("MISSED \n");
+//		DBG("MISSED state %s\n",state[radio_mgr.state]);
 	}
 }
+#ifdef LINUX
 static void radio_mgr_timer_cb(void) {
 	radio_fn();
 }
+#endif
 void radio_init() {
 	radio_mgr.state = RADIO_STATE_INIT;
 	memset(&packet_used,0,PACKET_BUF_SIZE);

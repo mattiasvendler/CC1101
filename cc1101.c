@@ -95,7 +95,7 @@ struct CC1101 {
 /*		FUNCTION PROTOPYTES	(that are neccessary not to case any compiler errors)	*/
 //------------------------------------------------------------------------------------
 void CC1101_setSyncWord(byte *sync, bool save);
-void CC1101_setDefaultRegs();
+void CC1101_setDefaultRegs(void);
 void CC1101_setDevAddress(byte addr, bool save);
 void CC1101_setChannel(byte chnl, bool save);
 void CC1101_setCarrierFreq(byte freq);
@@ -133,16 +133,10 @@ void CC1101_writeReg(byte regAddr, byte value) {
  * 'len'        Data length
  */
 void CC1101_writeBurstReg(byte regAddr, byte* buffer, byte len) {
-	byte addr, i;
-
-	addr = regAddr | WRITE_BURST;         // Enable burst transfer
-	hw->spiBurstWrite(regAddr, buffer, len);
+	hw->spiBurstWrite(regAddr,(unsigned char *) buffer, len);
 }
 void CC1101_writeBurstTXFIFO(byte regAddr, byte* buffer, byte len) {
-	byte addr;
-
-	addr = regAddr;         // Enable burst transfer
-	hw->spiBurstWrite(regAddr, buffer, len);
+	hw->spiBurstWrite(regAddr, (unsigned char *) buffer, len);
 }
 
 /**
@@ -193,9 +187,9 @@ byte CC1101_readRegData(byte regAddr, byte regType) {
  * 'len'        Data length
  */
 void CC1101_readBurstReg(byte * buffer, byte regAddr, byte len) {
-	byte addr, i;
+	byte addr;
 	addr = regAddr | READ_BURST;
-	hw->spiBurstRead(addr,buffer,len);
+	hw->spiBurstRead(addr,(unsigned char *)buffer,len);
 }
 
 /**
@@ -214,7 +208,7 @@ void CC1101_reset(void) {
  *
  * Configure CC1101 registers
  */
-void CC1101_setDefaultRegs() {
+void CC1101_setDefaultRegs(void) {
 	byte defSyncWrd[] = { CC1101_DEFVAL_SYNC1, CC1101_DEFVAL_SYNC0 };
 
 	CC1101_writeReg(CC1101_IOCFG2, 0x0E);
@@ -283,12 +277,12 @@ void CC1101_init(struct cc1101_hw *cc1101_hw) {
 	CC1101_writeReg(CC1101_PKTLEN,0x3D);
 // Reset CC1101
 	// Configure PATABLE
-	hw->spiBurstWrite(CC1101_PATABLE, (byte*) paTable, 8);
+	hw->spiBurstWrite(CC1101_PATABLE, (unsigned char *) paTable, 8);
 	//CC1101_writeReg(CC1101_PATABLE, CC1101.paTableByte);
 
-	char read = CC1101_readReg(CC1101_PARTNUM, CC1101_STATUS_REGISTER);
-	read = CC1101_readReg(CC1101_VERSION, CC1101_STATUS_REGISTER);
-	read = CC1101_readReg(CC1101_MARCSTATE, CC1101_STATUS_REGISTER);
+	CC1101_readReg(CC1101_PARTNUM, CC1101_STATUS_REGISTER);
+	CC1101_readReg(CC1101_VERSION, CC1101_STATUS_REGISTER);
+	CC1101_readReg(CC1101_MARCSTATE, CC1101_STATUS_REGISTER);
 
 	//byte syncWord = 199;
 	//CC1101_setSyncWord(&syncWord, false);

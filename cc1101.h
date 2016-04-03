@@ -349,7 +349,7 @@ struct cc1101_hw {
 };
 void CC1101_init(struct cc1101_hw *hw);
 void CC1101_setSyncWord(byte *sync, boolean save);
-void CC1101_setDefaultRegs();
+void CC1101_setDefaultRegs(void);
 void CC1101_setDevAddress(byte addr, boolean save);
 void CC1101_setChannel(byte chnl, boolean save);
 void CC1101_setCarrierFreq(byte freq);
@@ -357,6 +357,9 @@ boolean CC1101_sendData(CCPACKET packet);
 byte CC1101_receiveData(CCPACKET * packet);
 boolean CC1101_rx_mode(void);
 boolean CC1101_tx_fifo_empty(void);
+void CC1101_cmdStrobe(byte cmd);
+byte CC1101_readReg(byte regAddr, byte regType) ;
+
 
 
 #endif
