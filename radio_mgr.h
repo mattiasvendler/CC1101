@@ -34,6 +34,10 @@ struct packet_queue {
 	struct packet_queue *next;
 };
 
+struct rssi_lqi{
+	short rssi;
+	char lqi;
+};
 struct radio_mgr{
 	enum radio_state state;
 	unsigned short time_in_state;
@@ -44,5 +48,6 @@ void radio_state_machine(struct radio_mgr *mgr);
 void radio_notify(void);
 void radio_send(unsigned char *buffer,int len,void (*radio_send_done_fn)(unsigned int res,void *userdata),void *userdata);
 void radio_init(void);
+void radio_link_status(struct rssi_lqi *status);
 void radio_fn(void);
 #endif /* CC1101_RADIO_MGR_H_ */

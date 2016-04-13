@@ -230,6 +230,22 @@ void radio_send(unsigned char *buffer, int len,
 		queue = pq;
 	}
 }
+
+void radio_link_status(struct rssi_lqi *status){
+	unsigned char rssi;
+	status->rssi=0;
+//	DBG("radio_link_status start\n");
+	CC1101_readBurstReg(&rssi,CC1101_RSSI,1);
+//	DBG("radio_link_status 1\n");
+	CC1101_readBurstReg(&status->lqi,CC1101_LQI,1);
+
+//	DBG("radio_link_status 2\n");
+	if(rssi >= 128){
+		status->rssi = (((short)rssi - 256)/2)-74;
+	}else{
+		status->rssi = ((short)rssi/2)-74;
+	}
+}
 void radio_notify() {
 	if (radio_mgr.state == RADIO_STATE_TX && (packet_flags & SENDING)) {
 		packet_flags |= PACKET_SENT_OK;
