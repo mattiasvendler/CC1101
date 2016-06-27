@@ -30,6 +30,7 @@
 #define _CC1101_H
 
 #include "ccpacket.h"
+#include <types.h>
 //typedef char byte;
 //typedef char boolean;
 
@@ -234,9 +235,9 @@ enum RFSTATE
  * or when the radio enters RXFIFO_OVERFLOW state. In TX the pin will de-assert if the TX FIFO underflows
  * Settings optimized for low current consumption
  */
-#define CC1101_DEFVAL_IOCFG2     0x09        // GDO2 Output Pin Configuration
+#define CC1101_DEFVAL_IOCFG2     0x29        // GDO2 Output Pin Configuration
 #define CC1101_DEFVAL_IOCFG1     0x2E        // GDO1 Output Pin Configuration
-#define CC1101_DEFVAL_IOCFG0     0x06        // GDO0 Output Pin Configuration
+#define CC1101_DEFVAL_IOCFG0     0x3F        // GDO0 Output Pin Configuration
 #define CC1101_DEFVAL_FIFOTHR    0x07        // RX FIFO and TX FIFO Thresholds
 #define CC1101_DEFVAL_SYNC1      0xB5        // Synchronization word, high byte
 #define CC1101_DEFVAL_SYNC0      0x47        // Synchronization word, low byte
@@ -323,7 +324,7 @@ enum RFSTATE
 // PATABLE values
 #define PA_LowPower               0x60
 #define PA_LongDistance           0xC0
-#define getMarcState readStatusReg(CC1101_MARCSTATE)
+#define getMarcState() readStatusReg(CC1101_MARCSTATE)
 #define resetRadio() CC1101_cmdStrobe(CC1101_STX)
 
 //enum cc1101_state{
@@ -344,6 +345,7 @@ struct cc1101_hw {
 	void (*spiBurstRead)(const unsigned char regAddr, unsigned char data[], int len);
 	void *userdata;
 	void (*packet_data_input)(unsigned char len, unsigned char *data,void *userdata);
+	void (*radio_interrupt)(u8_t state);
 	unsigned char (*spiReadRegData) (const unsigned char regAddr);
 
 };
@@ -359,6 +361,8 @@ boolean CC1101_rx_mode(void);
 boolean CC1101_tx_fifo_empty(void);
 void CC1101_cmdStrobe(byte cmd);
 byte CC1101_readReg(byte regAddr, byte regType) ;
+void CC1101_readBurstReg(byte * buffer, byte regAddr, byte len);
+void CC1101_interrupt(u8_t state);
 
 
 

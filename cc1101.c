@@ -26,11 +26,14 @@
  */
 
 #include "cc1101.h"
+
 #include <stdio.h>
-#include "cc1101_gpio.h"
+
+#include "../generic_noarch/debug/debug.h"
 
 //extern GPIO_Handle    hGpio; /* GPIO handle */
 static struct cc1101_hw *hw;
+static u8_t interrupt_state = 0;
 
 /**
  * Macros
@@ -56,8 +59,7 @@ typedef char bool;
  * PATABLE
  */
 //const byte paTable[8] = { 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
-
-const byte paTable[8] ={ 0x60, 0x60, 0x60, 0x60, 0x60, 0x60, 0x60, 0x60 };
+const byte paTable[8] = { 0x60, 0x60, 0x60, 0x60, 0x60, 0x60, 0x60, 0x60 };
 
 struct CC1101 {
 	/*
@@ -133,7 +135,7 @@ void CC1101_writeReg(byte regAddr, byte value) {
  * 'len'        Data length
  */
 void CC1101_writeBurstReg(byte regAddr, byte* buffer, byte len) {
-	hw->spiBurstWrite(regAddr,(unsigned char *) buffer, len);
+	hw->spiBurstWrite(regAddr, (unsigned char *) buffer, len);
 }
 void CC1101_writeBurstTXFIFO(byte regAddr, byte* buffer, byte len) {
 	hw->spiBurstWrite(regAddr, (unsigned char *) buffer, len);
@@ -147,7 +149,7 @@ void CC1101_writeBurstTXFIFO(byte regAddr, byte* buffer, byte len) {
  * 'cmd'        Command strobe
  */
 void CC1101_cmdStrobe(byte cmd) {
-	hw->spiBurstWrite(cmd,NULL,0);	// basically we only need to send 1 byte
+	hw->spiBurstWrite(cmd, NULL, 0);	// basically we only need to send 1 byte
 }
 
 /**
@@ -189,7 +191,7 @@ byte CC1101_readRegData(byte regAddr, byte regType) {
 void CC1101_readBurstReg(byte * buffer, byte regAddr, byte len) {
 	byte addr;
 	addr = regAddr | READ_BURST;
-	hw->spiBurstRead(addr,(unsigned char *)buffer,len);
+	hw->spiBurstRead(addr, (unsigned char *) buffer, len);
 }
 
 /**
@@ -199,8 +201,6 @@ void CC1101_readBurstReg(byte * buffer, byte regAddr, byte len) {
  */
 void CC1101_reset(void) {
 	hw->spiWriteReg(CC1101_SRES, 0x00);
-
-	CC1101_setDefaultRegs();                     // Reconfigure CC1101
 }
 
 /**
@@ -211,9 +211,9 @@ void CC1101_reset(void) {
 void CC1101_setDefaultRegs(void) {
 	byte defSyncWrd[] = { CC1101_DEFVAL_SYNC1, CC1101_DEFVAL_SYNC0 };
 
-	CC1101_writeReg(CC1101_IOCFG2, 0x0E);
+	CC1101_writeReg(CC1101_IOCFG2, CC1101_DEFVAL_IOCFG2);
 	CC1101_writeReg(CC1101_IOCFG1, CC1101_DEFVAL_IOCFG1);
-	CC1101_writeReg(CC1101_IOCFG0, CC1101_DEFVAL_IOCFG0);
+	CC1101_writeReg(CC1101_IOCFG0, 0x06);
 	CC1101_writeReg(CC1101_FIFOTHR, CC1101_DEFVAL_FIFOTHR);
 	CC1101_writeReg(CC1101_PKTLEN, 0x3D);
 	CC1101_writeReg(CC1101_PKTCTRL1, CC1101_DEFVAL_PKTCTRL1);
@@ -240,8 +240,10 @@ void CC1101_setDefaultRegs(void) {
 	CC1101_writeReg(CC1101_MDMCFG0, CC1101_DEFVAL_MDMCFG0);
 	CC1101_writeReg(CC1101_DEVIATN, CC1101_DEFVAL_DEVIATN);
 	CC1101_writeReg(CC1101_MCSM2, CC1101_DEFVAL_MCSM2);
+//	CC1101_writeReg(CC1101_MCSM1, 0x0F);
 	CC1101_writeReg(CC1101_MCSM1, CC1101_DEFVAL_MCSM1);
 	CC1101_writeReg(CC1101_MCSM0, CC1101_DEFVAL_MCSM0);
+//	CC1101_writeReg(CC1101_MCSM0, 0x24);
 	CC1101_writeReg(CC1101_FOCCFG, CC1101_DEFVAL_FOCCFG);
 	CC1101_writeReg(CC1101_BSCFG, CC1101_DEFVAL_BSCFG);
 	CC1101_writeReg(CC1101_AGCCTRL2, CC1101_DEFVAL_AGCCTRL2);
@@ -274,7 +276,7 @@ void CC1101_setDefaultRegs(void) {
 void CC1101_init(struct cc1101_hw *cc1101_hw) {
 	hw = cc1101_hw;
 	CC1101_reset();
-	CC1101_writeReg(CC1101_PKTLEN,0x3D);
+	CC1101_writeReg(CC1101_PKTLEN, 0x3D);
 // Reset CC1101
 	// Configure PATABLE
 	hw->spiBurstWrite(CC1101_PATABLE, (unsigned char *) paTable, 8);
@@ -283,12 +285,16 @@ void CC1101_init(struct cc1101_hw *cc1101_hw) {
 	CC1101_readReg(CC1101_PARTNUM, CC1101_STATUS_REGISTER);
 	CC1101_readReg(CC1101_VERSION, CC1101_STATUS_REGISTER);
 	CC1101_readReg(CC1101_MARCSTATE, CC1101_STATUS_REGISTER);
+	CC1101_setDefaultRegs();                     // Reconfigure CC1101
 
-	//byte syncWord = 199;
-	//CC1101_setSyncWord(&syncWord, false);
+//	byte syncWord = 199;
+//	CC1101_setSyncWord(&syncWord, false);
 	CC1101_setCarrierFreq(CFREQ_433);
 	CC1101_disableAddressCheck();
 	setIdleState();
+	flushRxFifo();
+	flushTxFifo();
+	setRxState();
 
 }
 
@@ -321,7 +327,10 @@ void CC1101_setSyncWord(byte *sync, bool save) {
  * setDevAddress
  *
  * Set device address
- *
+ * else {
+ outgoingMessage = null;
+ nextState = RadioPacketManagerState.RX;
+ }
  * 'addr'       Device address
  * 'save' If TRUE, save parameter in EEPROM
  */
@@ -408,7 +417,7 @@ boolean CC1101_sendData(CCPACKET packet) {
 	CC1101.rfState = RFSTATE_TX;
 
 	// Enter RX state
-//	setRxState();
+	setRxState();
 	// Check that the RX state has been entered
 	marcState = readStatusReg(CC1101_MARCSTATE) & 0x1F;
 	if (marcState == 0x11)        // RX_OVERFLOW
@@ -417,47 +426,53 @@ boolean CC1101_sendData(CCPACKET packet) {
 	if (marcState == 0x16)        // TX_UNDERFLOW
 		flushTxFifo();              // flush receive queue
 
-
-
 	// Set data length at the first position of the TX FIFO
 
 	CC1101_writeReg(CC1101_TXFIFO, packet.length);
 	// Write data into the TX FIFO
-	CC1101_writeBurstTXFIFO(CC1101_TXFIFO_BURST, packet.data, packet.length);
+	CC1101_writeBurstTXFIFO(CC1101_TXFIFO_BURST, &packet.data[0], packet.length);
 	// CCA enabled: will enter TX state only if the channel is clear
 	setTxState();
 
 	// Check that TX state is being entered (state = RXTX_SETTLING)
-//	marcState = readStatusReg(CC1101_MARCSTATE) & 0x1F;
-//
-//	if ((marcState != 0x13) && (marcState != 0x14) && (marcState != 0x15)) {
-//		setIdleState();       // Enter IDLE state
-//		flushTxFifo();        // Flush Tx FIFO
-//		setRxState();         // Back to RX state
-//
-//		// Declare to be in Rx state
-//		CC1101.rfState = RFSTATE_RX;
-//		return false;
-//	}
+	while((marcState = (readStatusReg(CC1101_MARCSTATE) & 0x1F)) <= 0x10);
+
+	if ((marcState != 0x13) && (marcState != 0x14) && (marcState != 0x15)) {
+		setIdleState();       // Enter IDLE state
+		flushTxFifo();        // Flush Tx FIFO
+		setRxState();         // Back to RX state
+
+		// Declare to be in Rx state
+		CC1101.rfState = RFSTATE_RX;
+		dbg_printf("TX FAIL MARCSTATE %x\n", readStatusReg(CC1101_MARCSTATE) & 0x1F);
+		return false;
+	}
 
 	// Wait for the sync word to be transmitted
+	while (!interrupt_state);
+	while (interrupt_state) ;
 //	hw->wait_GDO0_high();
 //
 //	// Wait until the end of the packet transmission
 //	hw->wait_GDO0_low();
 	// Check that the TX FIFO is empty
+	marcState = getMarcState() & 0x1F;
+	dbg_printf("After send %x\n",marcState);
+	if(marcState == 0x16 && !CC1101_tx_fifo_empty()){
+		flushTxFifo();
+		setRxState();
+	}
 	return true;
 }
-boolean CC1101_tx_fifo_empty(void){
-	if ((readStatusReg(CC1101_TXBYTES) & 0x7F) == 0){
+boolean CC1101_tx_fifo_empty(void) {
+	if ((readStatusReg(CC1101_TXBYTES) & 0x7F) == 0) {
 		return true;
 	}
 	return false;
 
 }
-boolean CC1101_rx_mode(void){
+boolean CC1101_rx_mode(void) {
 	byte marcState;
-
 	// Enter RX state
 	setRxState();
 	// Check that the RX state has been entered
@@ -468,8 +483,12 @@ boolean CC1101_rx_mode(void){
 		if (marcState == 0x16)        // TX_UNDERFLOW
 			flushTxFifo();              // flush receive queue
 
-		return false;
+		dbg_printf("set rx mode fail MARCSTATE %x \n", marcState);
+
+//		return false;
 	}
+	dbg_printf("set rx mode MARCSTATE %x \n", marcState);
+
 	return true;
 }
 /**
@@ -494,7 +513,7 @@ byte CC1101_receiveData(CCPACKET * packet) {
 	}
 	// Any byte waiting to be read?
 	// Read data length
-	else if ((packet->length = readConfigReg(CC1101_RXFIFO)) ) {
+	else if ((packet->length = readConfigReg(CC1101_RXFIFO))) {
 
 		// If packet is too long
 		if (packet->length > CC1101_DATA_LEN) {
@@ -511,16 +530,19 @@ byte CC1101_receiveData(CCPACKET * packet) {
 			packet->lqi = val & 0x7F;
 			packet->crc_ok = (val & 0x80);
 		}
-	}
-	else {
+	} else {
 		packet->length = 0;
 	}
-	if(!packet->crc_ok){
+	if (!packet->crc_ok) {
 		flushRxFifo();
 	}
-	CC1101_cmdStrobe(CC1101_SRX);
+//	CC1101_cmdStrobe(CC1101_SRX);
 	// Back to RX state
 	setRxState();
 
 	return packet->length;
+}
+
+void CC1101_interrupt(u8_t state) {
+	interrupt_state = state;
 }
