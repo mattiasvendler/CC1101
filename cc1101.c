@@ -444,7 +444,7 @@ boolean CC1101_sendData(CCPACKET packet) {
 
 		// Declare to be in Rx state
 		CC1101.rfState = RFSTATE_RX;
-		dbg_printf("TX FAIL MARCSTATE %x\n", readStatusReg(CC1101_MARCSTATE) & 0x1F);
+//		dbg_printf("TX FAIL MARCSTATE %x\n", readStatusReg(CC1101_MARCSTATE) & 0x1F);
 		return false;
 	}
 
@@ -457,7 +457,7 @@ boolean CC1101_sendData(CCPACKET packet) {
 //	hw->wait_GDO0_low();
 	// Check that the TX FIFO is empty
 	marcState = getMarcState() & 0x1F;
-	dbg_printf("After send %x\n",marcState);
+//	dbg_printf("After send %x\n",marcState);
 	if(marcState == 0x16 && !CC1101_tx_fifo_empty()){
 		flushTxFifo();
 		setRxState();
@@ -483,11 +483,11 @@ boolean CC1101_rx_mode(void) {
 		if (marcState == 0x16)        // TX_UNDERFLOW
 			flushTxFifo();              // flush receive queue
 
-		dbg_printf("set rx mode fail MARCSTATE %x \n", marcState);
+//		dbg_printf("set rx mode fail MARCSTATE %x \n", marcState);
 
 //		return false;
 	}
-	dbg_printf("set rx mode MARCSTATE %x \n", marcState);
+//	dbg_printf("set rx mode MARCSTATE %x \n", marcState);
 
 	return true;
 }

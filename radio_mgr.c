@@ -39,10 +39,10 @@ static byte last_marcstate = 0;
 //static unsigned char packet_used[PACKET_BUF_SIZE];
 static struct packet_queue *queue;
 extern struct rssi_lqi status;
-
+#ifdef STATE_DEBUG
 static const char *state[] = { "RADIO_STATE_INIT", "RADIO_STATE_RESET",
 		"RADIO_STATE_IDLE", "RADIO_STATE_RX", "RADIO_STATE_TX" };
-
+#endif
 //static struct packet_queue * alloc_packet(void) {
 //	struct packet_queue *q = NULL;
 //	unsigned char i;
@@ -112,21 +112,24 @@ enum radio_state radio_state_machine(struct radio_mgr *mgr,
 //			} else {
 //				dbg_printf("rx mode ok\n");
 //			}
-			dbg_printf("RADIO_STATE_IDLE marcstate %x \n",
-					(getMarcState() & 0x1F));
+//			dbg_printf("RADIO_STATE_IDLE marcstate %x \n",
+//					(getMarcState() & 0x1F));
+			CC1101_rx_mode();
+
 		} else if (msg->type == NOSYS_MSG_RADIO_NOTIFY) {
 			next_state = RADIO_STATE_RX;
 		} else if (current_packet) {
 			next_state = RADIO_STATE_TX;
-		}else if(msg->type == NOSYS_TIMER_MSG && (getMarcState() & 0x1F) != 0x0D){
-			dbg_printf("We should enter rx mode %x\n",getMarcState() & 0x1F);
-			CC1101_rx_mode();
 		}
+//		else if(msg->type == NOSYS_TIMER_MSG && (getMarcState() & 0x1F) != 0x0D){
+//			dbg_printf("We should enter rx mode %x\n",getMarcState() & 0x1F);
+//			CC1101_rx_mode();
+//		}
 		break;
 	case RADIO_STATE_RX:
 		if (CC1101_receiveData(&in_packet)) {
-			DBG("Len:%d\nLQI %d\nRSSI %d\nCRC %d\n", in_packet.length,
-					in_packet.rssi, in_packet.lqi, in_packet.crc_ok);
+//			DBG("Len:%d\nLQI %d\nRSSI %d\nCRC %d\n", in_packet.length,
+//					in_packet.rssi, in_packet.lqi, in_packet.crc_ok);
 			if (mgr->data_recieved && in_packet.crc_ok) {
 				mgr->data_recieved((unsigned char *) &in_packet.data[0],
 						(unsigned char) in_packet.length,
@@ -291,14 +294,6 @@ void radio_fn() {
 		if (msg->type == NOSYS_TIMER_MSG) {
 
 			mgr->time_in_state++;
-			if (mgr->time_in_state % 2 == 0) {
-				byte marcstate = getMarcState() & 0x1F;
-				if (marcstate != last_marcstate
-						&& mgr->state > RADIO_STATE_RESET) {
-					last_marcstate = marcstate;
-					dbg_printf("MARCSTATE: %x\n", last_marcstate);
-				}
-			}
 			if (mgr->state == RADIO_STATE_IDLE) {
 				radio_link_status(&status);
 			}
@@ -313,7 +308,9 @@ void radio_fn() {
 				if (next_state == mgr->state) {
 					break;
 				}
+#ifdef STATE_DEBUG
 				DBG("%s -> %s\n", state[mgr->state], state[next_state]);
+#endif
 				mgr->state = next_state;
 				mgr->time_in_state = 0;
 				msg->type = NOSYS_MSG_STATE;
