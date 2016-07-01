@@ -30,8 +30,8 @@ static u8_t msg_free[RADIO_MSG_SEND_QUEUE_SIZE];
 #define RSSI_OK (-90)
 
 #ifdef STATE_DEBUG
-static const char *states[] = { "INIT", "RESET", "IDLE", "RX", "RX_ACK",
-		"RX_ACK_DONE", "TX", "TX_DONE", "TX_ACK", "LBT"
+static const char *states[] = {"INIT", "RESET", "IDLE", "RX", "RX_ACK",
+	"RX_ACK_DONE", "TX", "TX_DONE", "TX_ACK", "LBT"
 
 };
 #endif
@@ -260,7 +260,8 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 //						radio_send_ack_done_fn, mgr);
 				next_state = RADIO_MSG_MSG_STATE_RX_ACK_DONE;
 			}
-		} else if (msg->type == NOSYS_TIMER_MSG && (status.rssi < RSSI_OK) && mgr->time_in_state > 5) {
+		} else if (msg->type == NOSYS_TIMER_MSG && (status.rssi < RSSI_OK)
+				&& mgr->time_in_state > 5) {
 //			struct radio_packet_header *h =
 //					(struct radio_packet_header *) &rx//_buff[0];
 //			dbg_printf("Acking seq %d rssi %d time in state %d\n",
@@ -286,43 +287,6 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 		break;
 	case RADIO_MSG_MGR_STATE_TX:
 		if (msg->type == NOSYS_MSG_STATE) {
-			if (status.rssi < RSSI_OK) {
-				if (tx_curr == NULL) {
-					if (tx_q != NULL) {
-						tx_curr = tx_q;
-						tx_q = tx_q->next;
-					} else {
-						next_state = RADIO_MSG_MGR_STATE_IDLE;
-						break;
-					}
-				}
-//				struct radio_packet_header *h =
-//						(struct radio_packet_header *) &tx_curr->data[0];
-				if (tx_curr != NULL) {
-					if (radio_send(&tx_curr->data[0], tx_curr->len,
-							radio_send_done_fn, mgr) == ERR_OK) {
-						next_state = RADIO_MSG_MGR_STATE_TX_DONE;
-						//					dbg_printf("Unable to send radio busy\n");
-					} else {
-						dbg_printf("Tx fail\n");
-						if (tx_curr->send_done_cb) {
-							tx_curr->send_done_cb(0, tx_curr->userdata);
-						}
-
-						if (tx_curr) {
-							free_msg(tx_curr);
-							tx_curr = NULL;
-						}
-						next_state = RADIO_MSG_MGR_STATE_IDLE;
-					}
-				} else {
-					next_state = RADIO_MSG_MGR_STATE_IDLE;
-					tx_curr = NULL;
-					dbg_printf("TX_CURR null in tx\n");
-				}
-			}
-		} else
-			if (status.rssi < RSSI_OK && msg->type == NOSYS_TIMER_MSG) {
 			if (tx_curr == NULL) {
 				if (tx_q != NULL) {
 					tx_curr = tx_q;
@@ -332,25 +296,28 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 					break;
 				}
 			}
-			struct radio_packet_header *h =
-					(struct radio_packet_header *) &tx_curr->data[0];
+			if (tx_curr != NULL) {
+				if (radio_send(&tx_curr->data[0], tx_curr->len,
+						radio_send_done_fn, mgr) == ERR_OK) {
+					next_state = RADIO_MSG_MGR_STATE_TX_DONE;
+					//					dbg_printf("Unable to send radio busy\n");
+				} else {
+					dbg_printf("Tx fail\n");
+					if (tx_curr->send_done_cb) {
+						tx_curr->send_done_cb(0, tx_curr->userdata);
+					}
 
-			if (radio_send(&tx_curr->data[0], tx_curr->len, radio_send_done_fn,
-					mgr) == ERR_OK) {
-				dbg_printf("Sending seq %d\n", htons(h->seq));
-				next_state = RADIO_MSG_MGR_STATE_TX_DONE;
-//					dbg_printf("Unable to send radio busy\n");
+					if (tx_curr) {
+						free_msg(tx_curr);
+						tx_curr = NULL;
+					}
+					next_state = RADIO_MSG_MGR_STATE_IDLE;
+				}
 			} else {
-				if (tx_curr->send_done_cb) {
-					tx_curr->send_done_cb(0, tx_curr->userdata);
-				}
-				if (tx_curr) {
-					free_msg(tx_curr);
-					tx_curr = NULL;
-				}
 				next_state = RADIO_MSG_MGR_STATE_IDLE;
+				tx_curr = NULL;
+				dbg_printf("TX_CURR null in tx\n");
 			}
-
 		} else if (msg->type == NOSYS_TIMER_MSG && mgr->time_in_state > 100) {
 			if (tx_curr->send_done_cb) {
 				tx_curr->send_done_cb(0, tx_curr->userdata);
