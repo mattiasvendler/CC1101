@@ -253,19 +253,8 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 			h->length = 0;
 			h->flags |= 0x80;
 			h->flags &= ~0x10;
-			if (status.rssi < RSSI_OK) {
-//				dbg_printf("Direct acking seq %d rssi %d\n", htons(h->seq),
-//						status.rssi);
-//				radio_send(&rx_buff[0], sizeof(struct radio_packet_header),
-//						radio_send_ack_done_fn, mgr);
-				next_state = RADIO_MSG_MSG_STATE_RX_ACK_DONE;
-			}
 		} else if (msg->type == NOSYS_TIMER_MSG && (status.rssi < RSSI_OK)
 				&& mgr->time_in_state > 5) {
-//			struct radio_packet_header *h =
-//					(struct radio_packet_header *) &rx//_buff[0];
-//			dbg_printf("Acking seq %d rssi %d time in state %d\n",
-//					htons(h->seq), status.rssi, mgr->time_in_state);
 			if (radio_send(&rx_buff[0], sizeof(struct radio_packet_header),
 					radio_send_ack_done_fn, mgr) == ERR_OK) {
 				next_state = RADIO_MSG_MSG_STATE_RX_ACK_DONE;
