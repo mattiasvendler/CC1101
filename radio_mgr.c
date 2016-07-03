@@ -94,12 +94,12 @@ enum radio_state radio_state_machine(struct radio_mgr *mgr,
 			queue = NULL;
 			current_packet = NULL;
 		} else if (msg->type == NOSYS_TIMER_MSG) {
+//			if (marcState == 0x01) {
+			setRxState();
 			byte marcState = (getMarcState() & 0x1F);
 			dbg_printf("MARCSTATE in reset %d\n", marcState);
-//			if (marcState == 0x01) {
-			mgr->enable_interrupt();
-			setRxState();
 			dbg_printf("Reset done\n");
+			mgr->enable_interrupt();
 			next_state = RADIO_STATE_IDLE;
 //			}
 		}

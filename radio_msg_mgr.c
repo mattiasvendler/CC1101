@@ -27,7 +27,7 @@ static struct radio_msg_send_queue *tx_curr;
 static struct radio_msg_send_queue msg_buf[RADIO_MSG_SEND_QUEUE_SIZE];
 static u8_t msg_buf_size = RADIO_MSG_SEND_QUEUE_SIZE;
 static u8_t msg_free[RADIO_MSG_SEND_QUEUE_SIZE];
-#define RSSI_OK (-90)
+#define RSSI_OK (-80)
 
 #ifdef STATE_DEBUG
 static const char *states[] = {"INIT", "RESET", "IDLE", "RX", "RX_ACK",
@@ -261,14 +261,14 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 			} else {
 				next_state = RADIO_MSG_MGR_STATE_IDLE;
 			}
-		} else if (msg->type == NOSYS_TIMER_MSG && mgr->time_in_state > 50) {
+		} else if (msg->type == NOSYS_TIMER_MSG && mgr->time_in_state > 90) {
 			next_state = RADIO_MSG_MGR_STATE_IDLE;
 		}
 		break;
 	case RADIO_MSG_MSG_STATE_RX_ACK_DONE:
 		if (msg->type == NOSYS_MSG_RADIO_APP_SEND_ACK) {
 			next_state = RADIO_MSG_MGR_STATE_IDLE;
-		} else if (msg->type == NOSYS_TIMER_MSG && mgr->time_in_state > 50) {
+		} else if (msg->type == NOSYS_TIMER_MSG && mgr->time_in_state > 5) {
 			next_state = RADIO_MSG_MGR_STATE_IDLE;
 			dbg_printf("Sending ack failed\n");
 		}
@@ -448,9 +448,10 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 		} else if (msg->type == NOSYS_TIMER_MSG) {
 			radio_link_status(&status);
 			if (status.rssi <= RSSI_OK) {
-				dbg_printf("LBT ok rssi=%d\n", status.rssi);
 				lbt_fail = 0;
 				next_state = RADIO_MSG_MGR_STATE_TX;
+			} else {
+				dbg_printf("LBT not ok rssi=%d\n", status.rssi);
 			}
 		}
 		if (mgr->time_in_state > 200) {
