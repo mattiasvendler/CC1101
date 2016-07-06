@@ -34,11 +34,11 @@ static struct packet_queue packet_buf;
 #define RADIO_RESET 0x04
 struct cc1101_hw cc1101_hw;
 #define RESET_TIME_IN_STATE mgr->time_in_state = 0
-static byte last_marcstate = 0;
 //static struct packet_queue packet_buff[PACKET_BUF_SIZE];
 //static unsigned char packet_used[PACKET_BUF_SIZE];
 static struct packet_queue *queue;
-extern struct rssi_lqi status;
+struct rssi_lqi status;
+#define STATE_DEBUG
 #ifdef STATE_DEBUG
 static const char *state[] = { "RADIO_STATE_INIT", "RADIO_STATE_RESET",
 		"RADIO_STATE_IDLE", "RADIO_STATE_RX", "RADIO_STATE_TX" };
@@ -88,18 +88,27 @@ enum radio_state radio_state_machine(struct radio_mgr *mgr,
 	}
 	case RADIO_STATE_RESET:
 		if (msg->type == NOSYS_MSG_STATE) {
-			dbg_printf("Reset radio start\n");
-			mgr->disable_interrupt();
+			if (mgr->disable_interrupt) {
+				mgr->disable_interrupt();
+
+			}
 			CC1101_init(&cc1101_hw);
+			dbg_printf("Reset radio start\n");
+
 			queue = NULL;
 			current_packet = NULL;
-		} else if (msg->type == NOSYS_TIMER_MSG) {
+		} else if (msg->type == NOSYS_TIMER_MSG && mgr->time_in_state > 20) {
 			byte marcState = (getMarcState() & 0x1F);
 			dbg_printf("MARCSTATE in reset %d\n", marcState);
 //			if (marcState == 0x01) {
-			mgr->enable_interrupt();
+			if (mgr->enable_interrupt) {
+				mgr->enable_interrupt();
+			}
 			setRxState();
 			dbg_printf("Reset done\n");
+//			if (mgr->reset_queue) {
+//				post_msg(mgr->reset_queue, NOSYS_MSG_RADIO_RESET_DONE);
+//			}
 			next_state = RADIO_STATE_IDLE;
 //			}
 		}
@@ -120,7 +129,16 @@ enum radio_state radio_state_machine(struct radio_mgr *mgr,
 			next_state = RADIO_STATE_RX;
 		} else if (current_packet) {
 			next_state = RADIO_STATE_TX;
+		}else if(msg->type == NOSYS_TIMER_MSG && mgr->time_in_state ==100){
+			if((getMarcState() & 0x1F)!=0x0D){
+				CC1101_rx_mode();
+			}
 		}
+//		else if(msg->type == NOSYS_TIMER_MSG && mgr->time_in_state >100){
+//			if((getMarcState() & 0x1F)!=0x0D){
+//				next_state = RADIO_STATE_RESET;
+//			}
+//		}
 //		else if(msg->type == NOSYS_TIMER_MSG && (getMarcState() & 0x1F) != 0x0D){
 //			dbg_printf("We should enter rx mode %x\n",getMarcState() & 0x1F);
 //			CC1101_rx_mode();
@@ -232,18 +250,18 @@ s32_t radio_send(unsigned char *buffer, int len,
 }
 
 void radio_link_status(struct rssi_lqi *status) {
-	status->rssi = 0;
+	memset(status,0,sizeof(struct rssi_lqi));
 //	DBG("radio_link_status start\n");
 	CC1101_readBurstReg((byte *) &status->rssi, CC1101_RSSI, 1);
 
 //	DBG("radio_link_status 1\n");
 	CC1101_readBurstReg(&status->lqi, CC1101_LQI, 1);
 
-//	DBG("radio_link_status 2\n");
+//	dbg_printf("radio_link_status %d\n",status->rssi);
 	if (status->rssi >= 128) {
-		status->rssi = (((short) status->rssi - 256) / 2) - 74;
+		status->rssi = (((s16_t) status->rssi - 256) / 2) - 74;
 	} else {
-		status->rssi = ((short) status->rssi / 2) - 74;
+		status->rssi = ((s16_t) status->rssi / 2) - 74;
 	}
 }
 void radio_notify(struct radio_mgr *mgr) {
@@ -292,12 +310,17 @@ void radio_fn() {
 	if (msg) {
 
 		if (msg->type == NOSYS_TIMER_MSG) {
-
 			mgr->time_in_state++;
 			if (mgr->state == RADIO_STATE_IDLE) {
-				radio_link_status(&status);
+//				radio_link_status(&status);
+				if((getMarcState() & 0x1F) == 0x11){
+					setIdleState();
+					flushRxFifo();
+					setRxState();
+				}
 			}
 		} else if (msg->type == NOSYS_MSG_RADIO_RESET) {
+			msg->type = NOSYS_MSG_STATE;
 			mgr->state = RADIO_STATE_RESET;
 			mgr->reset_queue = msg->ptr;
 		}

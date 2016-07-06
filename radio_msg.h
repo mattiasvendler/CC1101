@@ -51,8 +51,8 @@ typedef struct radio_msg_periodic_status{
 	u16_t value;
 }__attribute__((packed)) radio_msg_periodic_status_t;
 
-void radio_msg_hello_init(u8_t *buf);
-void radio_msg_login_response_init(u8_t *buf, u32_t target);
-void radio_msg_periodic_status_init(u8_t *buf,u32_t target, u16_t value);
+void radio_msg_hello_init(u8_t *buf,u32_t my_address);
+void radio_msg_login_response_init(u8_t *buf, u32_t target,u32_t my_address);
+void radio_msg_periodic_status_init(u8_t *buf,u32_t target, u32_t my_address,u16_t value);
 
 #endif /* SRC_RADIO_RADIO_MSG_H_ */

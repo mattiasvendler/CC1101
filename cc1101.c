@@ -33,7 +33,7 @@
 
 //extern GPIO_Handle    hGpio; /* GPIO handle */
 static struct cc1101_hw *hw;
-static u8_t interrupt_state = 0;
+static volatile u8_t interrupt_state = 0;
 
 /**
  * Macros
@@ -435,16 +435,17 @@ boolean CC1101_sendData(CCPACKET packet) {
 	setTxState();
 
 	// Check that TX state is being entered (state = RXTX_SETTLING)
-	while((marcState = (readStatusReg(CC1101_MARCSTATE) & 0x1F)) <= 0x10);
+	while(((marcState = (readStatusReg(CC1101_MARCSTATE) & 0x1F)) <= 0x10));
 
 	if ((marcState != 0x13) && (marcState != 0x14) && (marcState != 0x15)) {
 		setIdleState();       // Enter IDLE state
 		flushTxFifo();        // Flush Tx FIFO
+		flushRxFifo();
 		setRxState();         // Back to RX state
 
 		// Declare to be in Rx state
 		CC1101.rfState = RFSTATE_RX;
-//		dbg_printf("TX FAIL MARCSTATE %x\n", readStatusReg(CC1101_MARCSTATE) & 0x1F);
+		dbg_printf("TX FAIL MARCSTATE %x\n", readStatusReg(CC1101_MARCSTATE) & 0x1F);
 		return false;
 	}
 
@@ -485,9 +486,8 @@ boolean CC1101_rx_mode(void) {
 
 //		dbg_printf("set rx mode fail MARCSTATE %x \n", marcState);
 
-//		return false;
+		return false;
 	}
-//	dbg_printf("set rx mode MARCSTATE %x \n", marcState);
 
 	return true;
 }

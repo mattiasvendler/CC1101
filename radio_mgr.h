@@ -15,6 +15,7 @@
 #include <debug.h>
 #include <nosys_queue.h>
 #include <nosys_timer.h>
+#include <types.h>
 #define DBG dbg_printf
 #endif
 #ifndef PACKET_BUF_SIZE
@@ -37,7 +38,7 @@ struct packet_queue {
 };
 
 struct rssi_lqi{
-	short rssi;
+	s16_t rssi;
 	char lqi;
 };
 struct radio_mgr{

@@ -27,8 +27,8 @@ static struct radio_msg_send_queue *tx_curr;
 static struct radio_msg_send_queue msg_buf[RADIO_MSG_SEND_QUEUE_SIZE];
 static u8_t msg_buf_size = RADIO_MSG_SEND_QUEUE_SIZE;
 static u8_t msg_free[RADIO_MSG_SEND_QUEUE_SIZE];
-#define RSSI_OK (-90)
-
+#define RSSI_OK (-84)
+#define STATE_DEBUG
 #ifdef STATE_DEBUG
 static const char *states[] = {"INIT", "RESET", "IDLE", "RX", "RX_ACK",
 	"RX_ACK_DONE", "TX", "TX_DONE", "TX_ACK", "LBT"
@@ -37,7 +37,7 @@ static const char *states[] = {"INIT", "RESET", "IDLE", "RX", "RX_ACK",
 #endif
 extern struct rssi_lqi status;
 
-static struct radio_msg_send_queue * alloc_msg() {
+static struct radio_msg_send_queue * alloc_msg(void) {
 	struct radio_msg_send_queue *msg = NULL;
 	u8_t i;
 	for (i = 0; i < RADIO_MSG_SEND_QUEUE_SIZE; i++) {
@@ -105,7 +105,7 @@ void radio_msg_mgr_data_recieved_cb(unsigned char *data, unsigned char len,
 	} else {
 		setIdleState();
 		flushRxFifo();
-		dbg_printf(" missed data_recieved\n");
+//		dbg_printf(" missed data_recieved\n");
 	}
 //	CC1101_rx_mode();
 }
@@ -141,10 +141,8 @@ s32_t radio_msg_send(void *data, u8_t len, u8_t require_ack, void *userdata,
 		q->require_ack = require_ack;
 		q->next = NULL;
 		if (tx_q == NULL) {
-//			dbg_printf("Queue empty\n");
 			tx_q = q;
 		} else {
-//			dbg_printf("Multiple in queue\n");
 			struct radio_msg_send_queue *c = tx_q;
 			while (c->next != NULL)
 				c = c->next;
@@ -195,7 +193,7 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 			u8_t *msg_data = &rx_buff[sizeof(struct radio_packet_header)];
 			struct radio_packet_header *h =
 					(struct radio_packet_header *) &rx_buff[0];
-			if (htonl(h->target) == (u32_t) 0x00000002) {
+			if (htonl(h->target) == (u32_t) 0x00000003) {
 //				dbg_printf("SOURCE: %x\n", htonl(h->source));
 //				dbg_printf("TARGET: %x\n", htonl(h->target));
 //				dbg_printf("SEQ %d\n", htons(h->seq));
@@ -230,13 +228,9 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 //						dbg_printf("msg %x\n", h->msg_type);
 					}
 					next_state = RADIO_MSG_MGR_STATE_IDLE;
-//					setIdleState();
-//					flushRxFifo();
-//					CC1101_rx_mode();
-
 				}
 			} else {
-				dbg_printf("Not for me %x\n", h->target);
+//				dbg_printf("Not for me %x\n", h->target);
 				next_state = RADIO_MSG_MGR_STATE_IDLE;
 			}
 		}
@@ -426,9 +420,9 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 				tx_curr->resends++;
 			} else {
 				dbg_printf("TX ACK timeout\n");
-//				if (tx_curr->send_done_cb) {
-//					tx_curr->send_done_cb(0, tx_curr->userdata);
-//				}
+				if (tx_curr->send_done_cb) {
+					tx_curr->send_done_cb(0, tx_curr->userdata);
+				}
 				if (tx_curr) {
 					free_msg(tx_curr);
 					tx_curr = NULL;
@@ -453,7 +447,7 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 				next_state = RADIO_MSG_MGR_STATE_TX;
 			}
 		}
-		if (mgr->time_in_state > 200) {
+		if (mgr->time_in_state > 100) {
 			radio_link_status(&status);
 			lbt_fail++;
 			dbg_printf("LBT fail rssi %d count %d\n", status.rssi, lbt_fail);
@@ -464,7 +458,7 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 				free_msg(tx_curr);
 				tx_curr = NULL;
 			}
-			if (lbt_fail > 5) {
+			if (lbt_fail > 10) {
 				lbt_fail = 0;
 				next_state = RADIO_MSG_MGR_STATE_RESET;
 			} else {
@@ -504,7 +498,7 @@ void radio_msg_mgr_fn(void) {
 						radio_msg_mgr_statemachine(mgr, msg);
 				if (mgr->state != next_state) {
 #ifdef STATE_DEBUG
-					dbg_printf("*%s -> %s\n", states[mgr->state],
+					dbg_printf("%s -> %s\n", states[mgr->state],
 							states[next_state]);
 #endif
 					msg->type = NOSYS_MSG_STATE;
