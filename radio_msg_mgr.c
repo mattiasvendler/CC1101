@@ -161,6 +161,7 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 	case RADIO_MSG_MGR_STATE_RESET:
 		if (msg->type == NOSYS_MSG_STATE) {
 			radio_mgr_reset(mgr->radio_mgr, mgr->inq);
+			free_msg(tx_curr);
 			tx_curr = NULL;
 			rx_len = 0;
 		} else if (msg->type == NOSYS_MSG_RADIO_RESET_DONE) {
