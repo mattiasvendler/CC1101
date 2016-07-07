@@ -58,6 +58,9 @@ enum radio_state radio_state_machine(struct radio_mgr *mgr,
 		}
 		break;
 	case RADIO_STATE_IDLE:
+		if(msg->type == NOSYS_MSG_STATE){
+			CC1101_rx_mode();
+		}
 		if (msg->type == NOSYS_MSG_RADIO_NOTIFY) {
 			next_state = RADIO_STATE_RX;
 		} else if (current_packet) {
@@ -94,18 +97,17 @@ enum radio_state radio_state_machine(struct radio_mgr *mgr,
 					next_state = RADIO_STATE_RX;
 					break;
 				}
-			} else {
-				if (current_packet && current_packet->radio_send_done_fn) {
-					current_packet->radio_send_done_fn(1,
-							current_packet->userdata);
-
-				}
+			}
+		} else if(msg->type == NOSYS_MSG_RADIO_NOTIFY){
+			if (current_packet && current_packet->radio_send_done_fn) {
+				current_packet->radio_send_done_fn(1,
+						current_packet->userdata);
 
 			}
-
 			next_state = RADIO_STATE_IDLE;
 			current_packet = NULL;
 		}
+
 
 		break;
 	}
