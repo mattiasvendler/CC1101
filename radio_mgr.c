@@ -60,21 +60,10 @@ enum radio_state radio_state_machine(struct radio_mgr *mgr,
 		}
 		break;
 	case RADIO_STATE_IDLE:
-		if (msg->type == NOSYS_MSG_STATE) {
-
-			if ((getMarcState() % 0x1F) != 0x0D) {
-				CC1101_rx_mode();
-			}
-
-		} else if (msg->type == NOSYS_MSG_RADIO_NOTIFY) {
+		if (msg->type == NOSYS_MSG_RADIO_NOTIFY) {
 			next_state = RADIO_STATE_RX;
 		} else if (current_packet) {
 			next_state = RADIO_STATE_TX;
-		} else if (msg->type == NOSYS_TIMER_MSG
-				&& (mgr->time_in_state % 100) == 0) {
-			if ((getMarcState() & 0x1F) != 0x0D) {
-				CC1101_rx_mode();
-			}
 		}
 		break;
 	case RADIO_STATE_RX:
