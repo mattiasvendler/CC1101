@@ -156,7 +156,7 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 	enum radio_msg_mgr_state next_state = mgr->state;
 	switch (mgr->state) {
 	case RADIO_MSG_MGR_STATE_INIT:
-		next_state = RADIO_MSG_MGR_STATE_IDLE;
+		next_state = RADIO_MSG_MGR_STATE_RESET;
 		break;
 	case RADIO_MSG_MGR_STATE_RESET:
 		if (msg->type == NOSYS_MSG_STATE) {

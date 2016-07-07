@@ -28,8 +28,6 @@ enum radio_state radio_state_machine(struct radio_mgr *mgr,
 	enum radio_state next_state = mgr->state;
 	switch (mgr->state) {
 	case RADIO_STATE_INIT: {
-
-		next_state = RADIO_STATE_RESET;
 		break;
 	}
 	case RADIO_STATE_RESET:
@@ -51,10 +49,10 @@ enum radio_state radio_state_machine(struct radio_mgr *mgr,
 					mgr->enable_interrupt();
 				}
 				setRxState();
-				dbg_printf("Reset done\n");
 				if (mgr->reset_queue) {
 					post_msg(mgr->reset_queue, NOSYS_MSG_RADIO_RESET_DONE);
 				}
+				dbg_printf("Reset done\n");
 				next_state = RADIO_STATE_IDLE;
 			}
 		}
