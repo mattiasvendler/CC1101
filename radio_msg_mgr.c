@@ -173,11 +173,7 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 		if (msg->type == NOSYS_MSG_STATE) {
 			rx_len = 0;
 		} else if (msg->type == NOSYS_MSG_RADIO_RECIEVED_DATA) {
-			if (tx_curr && tx_curr->require_ack) {
-				next_state = RADIO_MSG_MGR_STATE_TX_ACK;
-			} else {
 				next_state = RADIO_MSG_MGR_STATE_RX;
-			}
 		} else if ((msg->type == NOSYS_TIMER_MSG)
 				&& ((tx_q != NULL && tx_curr == NULL) || tx_curr != NULL)) {
 			next_state = RADIO_MSG_MGR_STATE_LBT;
