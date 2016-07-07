@@ -53,3 +53,19 @@ void radio_msg_periodic_status_init(u8_t *buf, u32_t target, u32_t my_address, u
 
 }
 
+void radio_msg_temperature_status_init(u8_t *buf, u32_t target, u32_t my_address, u16_t value) {
+	radio_msg_periodic_status_t *periodic_status =
+			(radio_msg_periodic_status_t *) buf;
+	memset(periodic_status, 0, sizeof(radio_msg_periodic_status_t));
+	seq++;
+	periodic_status->header.target = htonl(target);
+	periodic_status->header.source = htonl(my_address);
+	periodic_status->header.seq = htons(seq);
+	periodic_status->header.msg_type = CMD_TEMPERATURE_MSG;
+	periodic_status->header.length = sizeof(radio_msg_periodic_status_t)- sizeof(struct radio_packet_header);
+	periodic_status->header.flags = (RADIO_MSG_CTRL << 5);
+	periodic_status->header.flags |= 0x10;;
+	periodic_status->header.crc = 0;
+	periodic_status->value = htons(value);
+
+}

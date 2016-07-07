@@ -420,12 +420,18 @@ boolean CC1101_sendData(CCPACKET packet) {
 	setRxState();
 	// Check that the RX state has been entered
 	marcState = readStatusReg(CC1101_MARCSTATE) & 0x1F;
-	if (marcState == 0x11)        // RX_OVERFLOW
-		flushRxFifo();              // flush receive queue
-
-	if (marcState == 0x16)        // TX_UNDERFLOW
-		flushTxFifo();              // flush receive queue
-
+	if (marcState == 0x11){        // RX_OVERFLOW
+		setIdleState();       // Enter IDLE state
+		flushTxFifo();        // Flush Tx FIFO
+		flushRxFifo();
+		setRxState();         // Back to RX state
+	}
+	if (marcState == 0x16){        // TX_UNDERFLOW
+		setIdleState();       // Enter IDLE state
+		flushTxFifo();        // Flush Tx FIFO
+		flushRxFifo();
+		setRxState();         // Back to RX state
+	}
 	// Set data length at the first position of the TX FIFO
 
 	CC1101_writeReg(CC1101_TXFIFO, packet.length);
@@ -435,7 +441,11 @@ boolean CC1101_sendData(CCPACKET packet) {
 	setTxState();
 
 	// Check that TX state is being entered (state = RXTX_SETTLING)
-	while(((marcState = (readStatusReg(CC1101_MARCSTATE) & 0x1F)) <= 0x10));
+	while(((marcState = (readStatusReg(CC1101_MARCSTATE) & 0x1F)) <= 0x10)){
+//		dbg_printf("TX SETTLING FAIL MARCSTATE %x\n", readStatusReg(CC1101_MARCSTATE) & 0x1F);
+//
+//		return false;
+	}
 
 	if ((marcState != 0x13) && (marcState != 0x14) && (marcState != 0x15)) {
 		setIdleState();       // Enter IDLE state
@@ -519,6 +529,7 @@ byte CC1101_receiveData(CCPACKET * packet) {
 		if (packet->length > CC1101_DATA_LEN) {
 			flushRxFifo();
 			setRxState();
+			packet->crc_ok = 0;
 			packet->length = 0;   // Discard packet
 		} else {
 			// Read data packet

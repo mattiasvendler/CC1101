@@ -4,7 +4,7 @@
  *  Created on: Mar 10, 2016
  *      Author: mattias
  */
-
+#include <eclipse.h>
 #include <radio_msg_mgr.h>
 #include <nosys_queue.h>
 #include <nosys_task.h>
@@ -28,10 +28,9 @@ static struct radio_msg_send_queue msg_buf[RADIO_MSG_SEND_QUEUE_SIZE];
 static u8_t msg_buf_size = RADIO_MSG_SEND_QUEUE_SIZE;
 static u8_t msg_free[RADIO_MSG_SEND_QUEUE_SIZE];
 #define RSSI_OK (-84)
-#define STATE_DEBUG
 #ifdef STATE_DEBUG
-static const char *states[] = {"INIT", "RESET", "IDLE", "RX", "RX_ACK",
-	"RX_ACK_DONE", "TX", "TX_DONE", "TX_ACK", "LBT"
+static const char *states[] = { "INIT", "RESET", "IDLE", "RX", "RX_ACK",
+		"RX_ACK_DONE", "TX", "TX_DONE", "TX_ACK", "LBT"
 
 };
 #endif
@@ -46,7 +45,6 @@ static struct radio_msg_send_queue * alloc_msg(void) {
 			memset(msg, 0, sizeof(struct radio_msg_send_queue));
 			msg_free[i] = 1;
 			msg_buf_size--;
-//			dbg_printf("Queue size %d\n",msg_buf_size);
 			break;
 		}
 	}
@@ -63,7 +61,6 @@ static void free_msg(struct radio_msg_send_queue *msg) {
 			msg_free[i] = 0;
 			memset(&msg_buf[i], 0, sizeof(struct radio_msg_send_queue));
 			msg_buf_size++;
-//			dbg_printf("Queue size %d\n",msg_buf_size);
 			break;
 		}
 	}
@@ -88,11 +85,23 @@ static void radio_send_ack_done_fn(unsigned int res, void *userdata) {
 	msg->value = (u32_t) res;
 	nosys_queue_add_last(mgr->inq, msg);
 }
-
+static void print_packege(	struct radio_packet_header *h){
+#ifdef STATE_DEBUG
+	dbg_printf("Package:");
+	dbg_printf("SOURCE: %x\n", h->source);
+	dbg_printf("TARGET: %x\n", h->target);
+	dbg_printf("SEQ %d\n", htons(h->seq));
+	dbg_printf("CRC %x\n", h->crc);
+	dbg_printf("length %d\n", h->length);
+	dbg_printf("flags %x\n", h->flags);
+	dbg_printf("Type: %x\n", (h->flags & 0x60) >> 5);
+	dbg_printf("ack %s\n", ((h->flags & 0x80) > 0 ? "TRUE" : "FALSE"));
+	dbg_printf("msg %x\n", h->msg_type);
+#endif
+}
 void radio_msg_mgr_data_recieved_cb(unsigned char *data, unsigned char len,
 		unsigned char rssi, unsigned char lqi, void *userdata) {
 	struct radio_msg_mgr *mgr = (struct radio_msg_mgr *) userdata;
-//	dbg_printf("RX: Rssi %d LQI %d\n", rssi, lqi);
 	if (rx_len == 0) {
 		struct nosys_msg *msg = nosys_queue_create_msg();
 		if (msg) {
@@ -102,12 +111,7 @@ void radio_msg_mgr_data_recieved_cb(unsigned char *data, unsigned char len,
 			memcpy(&rx_buff[0], data, len);
 			nosys_queue_add_last(mgr->inq, msg);
 		}
-	} else {
-		setIdleState();
-		flushRxFifo();
-//		dbg_printf(" missed data_recieved\n");
 	}
-//	CC1101_rx_mode();
 }
 
 void radio_msg_mgr_init(struct radio_msg_mgr *mgr) {
@@ -120,11 +124,8 @@ void radio_msg_mgr_init(struct radio_msg_mgr *mgr) {
 	timer.timeout = 1;
 	timer.user_data = mgr;
 	nosys_timer_add(&timer);
-//	radio_mgr.data_recieved = data_recieved;
-//	radio_mgr.userdata = mgr;
 	tx_q = NULL;
 	ack_q = NULL;
-//	rx_ack = NULL;
 	tx_curr = NULL;
 	memset(&msg_free[0], 0, sizeof(msg_free));
 	memset(&msg_buf[0], 0, sizeof(msg_buf));
@@ -188,22 +189,11 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 		break;
 	case RADIO_MSG_MGR_STATE_RX:
 		if (msg->type == NOSYS_MSG_STATE) {
-//			rx_ack = alloc_msg();
-//			if (rx_ack) {
 			u8_t *msg_data = &rx_buff[sizeof(struct radio_packet_header)];
 			struct radio_packet_header *h =
 					(struct radio_packet_header *) &rx_buff[0];
 			if (htonl(h->target) == (u32_t) 0x00000003) {
-//				dbg_printf("SOURCE: %x\n", htonl(h->source));
-//				dbg_printf("TARGET: %x\n", htonl(h->target));
-//				dbg_printf("SEQ %d\n", htons(h->seq));
-//				dbg_printf("CRC %x\n", h->crc);
-//				dbg_printf("length %d\n", h->length);
-//				dbg_printf("flags %x\n", h->flags);
-//				dbg_printf("Type: %x\n", (h->flags & 0x60) >> 5);
-//				dbg_printf("ack %s \n",
-//						((h->flags & 0x80) > 0 ? "TRUE" : "FALSE"), h->flags);
-//				dbg_printf("msg %x\n", h->msg_type);
+				print_packege(h);
 				s32_t res = ERR_OK;
 				if (mgr->handle_ctrl_msg_cb
 						&& (((h->flags & 0x60) >> 5) & RADIO_MSG_CTRL) > 0) {
@@ -212,25 +202,11 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 				}
 				if (((h->flags & 0x10) != 0) && (res == ERR_OK)) {
 					next_state = RADIO_MSG_MGR_STATE_RX_ACK;
-				} else {
-					if (res == ERR_OK) {
-//						dbg_printf("We should NOT ack this message %d\n", res);
-//						dbg_printf("SOURCE: %x\n", htonl(h->source));
-//						dbg_printf("TARGET: %x\n", htonl(h->target));
-//						dbg_printf("SEQ %d\n", htons(h->seq));
-//						dbg_printf("CRC %x\n", h->crc);
-//						dbg_printf("length %d\n", h->length);
-//						dbg_printf("flags %x\n", h->flags);
-//						dbg_printf("Type: %x\n", (h->flags & 0x60) >> 5);
-//						dbg_printf("ack %s \n",
-//								((h->flags & 0x80) > 0 ? "TRUE" : "FALSE"),
-//								h->flags);
-//						dbg_printf("msg %x\n", h->msg_type);
-					}
-					next_state = RADIO_MSG_MGR_STATE_IDLE;
 				}
+					//Should not be acked
+					next_state = RADIO_MSG_MGR_STATE_IDLE;
+
 			} else {
-//				dbg_printf("Not for me %x\n", h->target);
 				next_state = RADIO_MSG_MGR_STATE_IDLE;
 			}
 		}
@@ -264,7 +240,6 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 			next_state = RADIO_MSG_MGR_STATE_IDLE;
 		} else if (msg->type == NOSYS_TIMER_MSG && mgr->time_in_state > 50) {
 			next_state = RADIO_MSG_MGR_STATE_IDLE;
-			dbg_printf("Sending ack failed\n");
 		}
 
 		break;
@@ -280,26 +255,13 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 				}
 			}
 			if (tx_curr != NULL) {
-				if (radio_send(&tx_curr->data[0], tx_curr->len,
-						radio_send_done_fn, mgr) == ERR_OK) {
-					next_state = RADIO_MSG_MGR_STATE_TX_DONE;
-					//					dbg_printf("Unable to send radio busy\n");
-				} else {
-					dbg_printf("Tx fail\n");
-					if (tx_curr->send_done_cb) {
-						tx_curr->send_done_cb(0, tx_curr->userdata);
-					}
+				radio_send(&tx_curr->data[0], tx_curr->len, radio_send_done_fn,
+						mgr);
+				next_state = RADIO_MSG_MGR_STATE_TX_DONE;
 
-					if (tx_curr) {
-						free_msg(tx_curr);
-						tx_curr = NULL;
-					}
-					next_state = RADIO_MSG_MGR_STATE_IDLE;
-				}
 			} else {
 				next_state = RADIO_MSG_MGR_STATE_IDLE;
 				tx_curr = NULL;
-				dbg_printf("TX_CURR null in tx\n");
 			}
 		} else if (msg->type == NOSYS_TIMER_MSG && mgr->time_in_state > 100) {
 			if (tx_curr->send_done_cb) {
@@ -314,27 +276,13 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 		break;
 	case RADIO_MSG_MGR_STATE_TX_DONE:
 		if (msg->type == NOSYS_MSG_RADIO_SEND_DONE) {
-			if (msg->value == 0) {
-				dbg_printf("Send done failed\n");
-				next_state = RADIO_MSG_MGR_STATE_IDLE;
-				if (tx_curr && tx_curr->send_done_cb) {
-					tx_curr->send_done_cb(msg->value, tx_curr->userdata);
-				}
-				if (tx_curr) {
-					free_msg(tx_curr);
-					tx_curr = NULL;
-				}
-
-				break;
-			} else if (msg->value == ERR_RADIO_TX_TIMEOUT) {
+			if (msg->value == ERR_RADIO_TX_TIMEOUT) {
 				next_state = RADIO_MSG_MGR_STATE_LBT;
 			} else if (tx_curr->require_ack) {
 				next_state = RADIO_MSG_MGR_STATE_TX_ACK;
 			} else {
 				if (tx_curr && tx_curr->send_done_cb) {
 					tx_curr->send_done_cb(msg->value, tx_curr->userdata);
-				} else {
-					dbg_printf("No callback\n");
 				}
 				if (tx_curr) {
 					free_msg(tx_curr);
@@ -342,27 +290,12 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 				}
 				next_state = RADIO_MSG_MGR_STATE_IDLE;
 			}
-		} else if (mgr->time_in_state > 100) {
-
-			next_state = RADIO_MSG_MGR_STATE_IDLE;
-			if (tx_curr && tx_curr->send_done_cb) {
-				tx_curr->send_done_cb(0, tx_curr->userdata);
-			}
-			if (tx_curr) {
-				free_msg(tx_curr);
-				tx_curr = NULL;
-			}
-			dbg_printf("TX_DONE TIMEOUT\n");
 		} else if (mgr->time_in_state >= 100) {
-			if (tx_curr->resends <= 5) {
+			if (tx_curr->resends < 5) {
 				next_state = RADIO_MSG_MGR_STATE_LBT;
 				tx_curr->resends++;
-				//				struct nosys_msg *resend = nosys_queue_create_msg();
-				//				resend->type = NOSYS_MSG_RADIO_RESEND;
-				//				nosys_queue_add_last(mgr->inq, resend);
-				//				mgr->time_in_state = 0;
 			} else {
-				dbg_printf("TX ACK timeout\n");
+				dbg_printf("TX SEND DONE timeout\n");
 				if (tx_curr->send_done_cb) {
 					tx_curr->send_done_cb(0, tx_curr->userdata);
 				}
@@ -385,20 +318,9 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 						(struct radio_packet_header *) &tx_curr->data[0];
 				if (h->target == tx_header->source && h->seq == tx_header->seq
 						&& (h->flags & 0x80) > 0) {
-//					dbg_printf("TX ACK: SOURCE: %x\n", h->source);
-//					dbg_printf("TX ACK: TARGET: %x\n", h->target);
-//				dbg_printf("TX ACK: SEQ %d\n", htons(h->seq));
-//					dbg_printf("TX ACK: CRC %x\n", h->crc);
-//					dbg_printf("TX ACK: length %d\n", h->length );
-//					dbg_printf("TX ACK: flags %x\n", h->flags);
-//					dbg_printf("TX ACK: Type: %x\n", (h->flags & 0x60) >> 5);
-//					dbg_printf("TX ACK: ack %s\n",
-//							((h->flags & 0x80) > 0 ? "TRUE" : "FALSE"));
-//					dbg_printf("TX ACK: msg %x\n", h->msg_type);
 					if (tx_curr->send_done_cb) {
 						tx_curr->send_done_cb(1, tx_curr->userdata);
 					}
-
 					if (tx_curr) {
 						free_msg(tx_curr);
 						tx_curr = NULL;
@@ -406,12 +328,8 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 					next_state = RADIO_MSG_MGR_STATE_IDLE;
 					break;
 				}
-//				else {
-//					dbg_printf("TX ACK Not for me %x req seq %d in ack %d\n",
-//							htonl(h->target), htons(h->seq),
-//							htons(tx_header->seq), (h->flags & 0x80));
-//					next_state = RADIO_MSG_MGR_STATE_RX;
-//				}
+			} else {
+				next_state = RADIO_MSG_MGR_STATE_LBT;
 			}
 
 		} else if (msg->type == NOSYS_TIMER_MSG && mgr->time_in_state >= 100) {
@@ -435,8 +353,7 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 		if (msg->type == NOSYS_MSG_STATE) {
 			radio_link_status(&status);
 			rx_len = 0;
-		}
-		if (msg->type == NOSYS_MSG_RADIO_RECIEVED_DATA) {
+		} else if (msg->type == NOSYS_MSG_RADIO_RECIEVED_DATA) {
 			lbt_fail = 0;
 			next_state = RADIO_MSG_MGR_STATE_RX;
 		} else if (msg->type == NOSYS_TIMER_MSG) {
@@ -445,24 +362,17 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 				dbg_printf("LBT ok rssi=%d\n", status.rssi);
 				lbt_fail = 0;
 				next_state = RADIO_MSG_MGR_STATE_TX;
-			}
-		}
-		if (mgr->time_in_state > 100) {
-			radio_link_status(&status);
-			lbt_fail++;
-			dbg_printf("LBT fail rssi %d count %d\n", status.rssi, lbt_fail);
-			if (tx_curr) {
-				if (tx_curr->send_done_cb) {
-					tx_curr->send_done_cb(0, tx_curr->userdata);
+			} else if (mgr->time_in_state > 100) {
+				radio_link_status(&status);
+				lbt_fail++;
+				dbg_printf("LBT fail rssi %d count %d\n", status.rssi,
+						lbt_fail);
+				if (lbt_fail > 10) {
+					lbt_fail = 0;
+					next_state = RADIO_MSG_MGR_STATE_RESET;
+				} else {
+					next_state = RADIO_MSG_MGR_STATE_IDLE;
 				}
-				free_msg(tx_curr);
-				tx_curr = NULL;
-			}
-			if (lbt_fail > 10) {
-				lbt_fail = 0;
-				next_state = RADIO_MSG_MGR_STATE_RESET;
-			} else {
-				next_state = RADIO_MSG_MGR_STATE_IDLE;
 			}
 		}
 		break;
@@ -476,18 +386,10 @@ void radio_msg_mgr_fn(void) {
 	u8_t skip_state = 0;
 	if (msg->type == NOSYS_TIMER_MSG) {
 		mgr->time_in_state++;
-//		if (mgr->time_in_state % 5000 == 0) {
-//			dbg_printf("%s tick %d\n", states[mgr->state], mgr->time_in_state);
-//		}
-//		if(state_print_tick++ % 1000 == 0){
-//			dbg_printf("RMM state %s time in state %d\n",states[mgr->state],mgr->time_in_state);
-//		}
 
 	} else if (msg->type == NOSYS_MSG_RADIO_RECIEVED_DATA
 			&& !(mgr->state == RADIO_MSG_MGR_STATE_TX_ACK
 					|| mgr->state == RADIO_MSG_MGR_STATE_IDLE)) {
-//		rx_len = 0;
-//		dbg_printf("Postpone\n");
 		nosys_msg_postpone(mgr->inq, msg);
 		skip_state = 1;
 	}
