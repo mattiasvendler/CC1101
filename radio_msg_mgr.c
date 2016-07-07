@@ -188,8 +188,8 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 			u8_t *msg_data = &rx_buff[sizeof(struct radio_packet_header)];
 			struct radio_packet_header *h =
 					(struct radio_packet_header *) &rx_buff[0];
+			print_packege(h);
 			if (htonl(h->target) == mgr->local_address) {
-				print_packege(h);
 				s32_t res = ERR_OK;
 				if (mgr->handle_ctrl_msg_cb
 						&& (((h->flags & 0x60) >> 5) & RADIO_MSG_CTRL) > 0) {
@@ -217,6 +217,7 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 			h->length = 0;
 			h->flags |= 0x80;
 			h->flags &= ~0x10;
+			print_packege(h);
 		} else if (msg->type == NOSYS_TIMER_MSG && mgr->time_in_state > 10) {
 			if (radio_send(&rx_buff[0], sizeof(struct radio_packet_header),
 					radio_send_ack_done_fn, mgr) == ERR_OK) {
@@ -251,6 +252,9 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 			if (tx_curr != NULL) {
 				if (radio_send(&tx_curr->data[0], tx_curr->len,
 						radio_send_done_fn, mgr) == ERR_OK) {
+					struct radio_packet_header *tx_header =
+										(struct radio_packet_header *) &tx_curr->data[0];
+					print_packege(tx_header);
 					next_state = RADIO_MSG_MGR_STATE_TX_DONE;
 				} else {
 					next_state = RADIO_MSG_MGR_STATE_IDLE;
@@ -301,7 +305,8 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 					(struct radio_packet_header *) &rx_buff[0];
 			struct radio_packet_header *tx_header =
 					(struct radio_packet_header *) &tx_curr->data[0];
-			if (h->target == tx_header->source && h->seq == tx_header->seq
+			print_packege(h);
+			if (h->target == mgr->local_address && h->seq == tx_header->seq
 					&& (h->flags & 0x80) > 0) {
 				if (tx_curr->send_done_cb) {
 					tx_curr->send_done_cb(1, tx_curr->userdata);
@@ -374,12 +379,13 @@ void radio_msg_mgr_fn(void) {
 	if (msg->type == NOSYS_TIMER_MSG) {
 		mgr->time_in_state++;
 
-	} else if (msg->type == NOSYS_MSG_RADIO_RECIEVED_DATA
-			&& !(mgr->state == RADIO_MSG_MGR_STATE_TX_ACK
-					|| mgr->state == RADIO_MSG_MGR_STATE_IDLE)) {
-		nosys_msg_postpone(mgr->inq, msg);
-		skip_state = 1;
 	}
+//	else if (msg->type == NOSYS_MSG_RADIO_RECIEVED_DATA
+//			&& !(mgr->state == RADIO_MSG_MGR_STATE_TX_ACK
+//					|| mgr->state == RADIO_MSG_MGR_STATE_IDLE)) {
+//		nosys_msg_postpone(mgr->inq, msg);
+//		skip_state = 1;
+//	}
 	if (msg) {
 		if (!skip_state) {
 			while (1) {
