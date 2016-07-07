@@ -4,7 +4,6 @@
  *  Created on: Mar 10, 2016
  *      Author: mattias
  */
-#include <eclipse.h>
 #include <radio_msg_mgr.h>
 #include <nosys_queue.h>
 #include <nosys_task.h>
@@ -18,7 +17,6 @@
 #include <radio_msg.h>
 static struct nosys_timer timer;
 static u8_t lbt_fail = 0;
-;
 static u8_t rx_buff[61];
 static volatile int rx_len;
 static struct radio_msg_send_queue *tx_q;
@@ -114,9 +112,10 @@ void radio_msg_mgr_data_recieved_cb(unsigned char *data, unsigned char len,
 	}
 }
 
-void radio_msg_mgr_init(struct radio_msg_mgr *mgr) {
+void radio_msg_mgr_init(struct radio_msg_mgr *mgr,u32_t local_address) {
 	mgr->state = RADIO_MSG_MGR_STATE_INIT;
 	mgr->time_in_state = 0;
+	mgr->local_address = local_address;
 	timer.cb = radio_msg_mgr_timer_cb;
 	timer.flags = NOSYS_TIMER_CONTINIOUS | NOSYS_TIMER_ACITVE;
 	timer.q = mgr->inq;
@@ -133,6 +132,7 @@ void radio_msg_mgr_init(struct radio_msg_mgr *mgr) {
 }
 s32_t radio_msg_send(void *data, u8_t len, u8_t require_ack, void *userdata,
 		void (*send_done_cb)(s32_t res, void *userdata)) {
+
 	struct radio_msg_send_queue *q = alloc_msg();
 	if (q) {
 		memcpy(&q->data[0], data, len);
@@ -192,7 +192,7 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 			u8_t *msg_data = &rx_buff[sizeof(struct radio_packet_header)];
 			struct radio_packet_header *h =
 					(struct radio_packet_header *) &rx_buff[0];
-			if (htonl(h->target) == (u32_t) 0x00000003) {
+			if (htonl(h->target) == mgr->local_address) {
 				print_packege(h);
 				s32_t res = ERR_OK;
 				if (mgr->handle_ctrl_msg_cb

@@ -4,7 +4,6 @@
  *  Created on: Feb 19, 2016
  *      Author: mattias
  */
-#include <eclipse.h>
 #include <radio_mgr.h>
 #include <string.h>
 #include <cc1101.h>
