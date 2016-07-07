@@ -303,7 +303,7 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 			struct radio_packet_header *tx_header =
 					(struct radio_packet_header *) &tx_curr->data[0];
 			print_packege(h);
-			if (h->target == mgr->local_address && h->seq == tx_header->seq
+			if (h->target == htonl(mgr->local_address) && h->seq == tx_header->seq
 					&& (h->flags & 0x80) > 0) {
 				if (tx_curr->send_done_cb) {
 					tx_curr->send_done_cb(1, tx_curr->userdata);
