@@ -6,25 +6,12 @@
  */
 #include <eclipse.h>
 #include <radio_mgr.h>
-#ifdef LINUX
-#include <timer.h>
-#include <pthread.h>
-#include <stdio.h>
-#include <errno.h>
-#include <stdlib.h>
-#endif
 #include <string.h>
 #include <cc1101.h>
 #include <nosys_task.h>
 #include <nosys_queue.h>
 #include <error_codes.h>
 struct radio_mgr radio_mgr;
-#ifdef LINUX
-static pthread_t t;
-#endif
-#ifndef NULL
-#define NULL (void *)0;
-#endif
 static CCPACKET in_packet;
 static struct packet_queue *current_packet;
 static struct packet_queue packet_buf;
@@ -72,7 +59,6 @@ enum radio_state radio_state_machine(struct radio_mgr *mgr,
 				next_state = RADIO_STATE_IDLE;
 			}
 		}
-//		}
 		break;
 	case RADIO_STATE_IDLE:
 		if (msg->type == NOSYS_MSG_STATE) {
