@@ -44,7 +44,7 @@ enum radio_state radio_state_machine(struct radio_mgr *mgr,
 		} else if (msg->type == NOSYS_TIMER_MSG) {
 			byte marcState = (getMarcState() & 0x1F);
 			if (marcState == 0x0D) {
-				dbg_printf("MARCSTATE in reset %d\n", marcState);
+				dbg_printf("MARCSTATE in reset %x\n", marcState);
 				if (mgr->enable_interrupt) {
 					mgr->enable_interrupt();
 				}
@@ -59,7 +59,9 @@ enum radio_state radio_state_machine(struct radio_mgr *mgr,
 		break;
 	case RADIO_STATE_IDLE:
 		if(msg->type == NOSYS_MSG_STATE){
-			CC1101_rx_mode();
+			if((getMarcState() & 0x1F) != 0x0D){
+				CC1101_rx_mode();
+			}
 		}
 		if (msg->type == NOSYS_MSG_RADIO_NOTIFY) {
 			next_state = RADIO_STATE_RX;
@@ -79,6 +81,8 @@ enum radio_state radio_state_machine(struct radio_mgr *mgr,
 
 			}
 			next_state = RADIO_STATE_IDLE;
+		}else if(msg->type == NOSYS_TIMER_MSG && mgr->time_in_state > 10){
+			next_state = RADIO_STATE_IDLE;
 		}
 		break;
 	case RADIO_STATE_TX: {
@@ -93,10 +97,14 @@ enum radio_state radio_state_machine(struct radio_mgr *mgr,
 					current_packet->radio_send_done_fn(0,
 							current_packet->userdata);
 				}
+
+				current_packet = NULL;
+
 				if ((getMarcState() & 0x1F) == 0x11) {
 					next_state = RADIO_STATE_RX;
 					break;
 				}
+				next_state = RADIO_STATE_IDLE;
 			}
 		} else if(msg->type == NOSYS_MSG_RADIO_NOTIFY){
 			if (current_packet && current_packet->radio_send_done_fn) {
