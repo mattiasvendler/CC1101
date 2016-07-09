@@ -360,14 +360,20 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 				next_state = RADIO_MSG_MGR_STATE_TX;
 			} else if (mgr->time_in_state > 100) {
 				radio_link_status(&status);
-				lbt_fail++;
-				dbg_printf("LBT fail rssi %d count %d\n", status.rssi,
-						lbt_fail);
-				if (lbt_fail > 10) {
+				if (status.rssi <= RSSI_OK) {
+					dbg_printf("LBT ok rssi=%d\n", status.rssi);
 					lbt_fail = 0;
-					next_state = RADIO_MSG_MGR_STATE_RESET;
+					next_state = RADIO_MSG_MGR_STATE_TX;
 				} else {
-					next_state = RADIO_MSG_MGR_STATE_IDLE;
+					lbt_fail++;
+					dbg_printf("LBT fail rssi %d count %d\n", status.rssi,
+							lbt_fail);
+					if (lbt_fail == 100) {
+						lbt_fail = 0;
+						next_state = RADIO_MSG_MGR_STATE_RESET;
+					} else {
+						next_state = RADIO_MSG_MGR_STATE_IDLE;
+					}
 				}
 			}
 		}
