@@ -291,6 +291,7 @@ void CC1101_init(struct cc1101_hw *cc1101_hw) {
 //	CC1101_setSyncWord(&syncWord, false);
 	CC1101_setCarrierFreq(CFREQ_433);
 	CC1101_disableAddressCheck();
+	disableCCA();
 	setIdleState();
 	flushRxFifo();
 	flushTxFifo();
@@ -399,6 +400,24 @@ void CC1101_setCarrierFreq(byte freq) {
 	CC1101.carrierFreq = freq;
 }
 
+static u8_t marcstate_get(void) {
+	byte marcState = 0xFF;
+	u8_t count = 0;
+	while (1) {
+		byte m = readStatusReg(CC1101_MARCSTATE) & 0x1F;
+		if (marcState == m) {
+			if(count>3){
+				return m;
+			}
+			count ++;
+		}else{
+			count = 0;
+		}
+		marcState = m;
+	}
+
+}
+
 /**
  * sendData
  *
@@ -417,62 +436,71 @@ boolean CC1101_sendData(CCPACKET packet) {
 	CC1101.rfState = RFSTATE_TX;
 
 	// Enter RX state
-	setRxState();
-	// Check that the RX state has been entered
-	marcState = readStatusReg(CC1101_MARCSTATE) & 0x1F;
-	if (marcState == 0x11){        // RX_OVERFLOW
-		setIdleState();       // Enter IDLE state
-		flushTxFifo();        // Flush Tx FIFO
-		flushRxFifo();
-		setRxState();         // Back to RX state
-	}
-	if (marcState == 0x16){        // TX_UNDERFLOW
-		setIdleState();       // Enter IDLE state
-		flushTxFifo();        // Flush Tx FIFO
-		flushRxFifo();
-		setRxState();         // Back to RX state
+	marcState = marcstate_get();
+	if (marcState != 0x0D) {
+		setRxState();
+		// Check that the RX state has been entered
+		if (marcState == 0x11) {        // RX_OVERFLOW
+			setIdleState();       // Enter IDLE state
+//			flushTxFifo();        // Flush Tx FIFO
+			flushRxFifo();
+			setRxState();         // Back to RX state
+		}
+		if (marcState == 0x16) {        // TX_UNDERFLOW
+			setIdleState();       // Enter IDLE state
+			flushTxFifo();        // Flush Tx FIFO
+//			flushRxFifo();
+			setRxState();         // Back to RX state
+		}
 	}
 	// Set data length at the first position of the TX FIFO
 
 	CC1101_writeReg(CC1101_TXFIFO, packet.length);
 	// Write data into the TX FIFO
-	CC1101_writeBurstTXFIFO(CC1101_TXFIFO_BURST, &packet.data[0], packet.length);
+	CC1101_writeBurstTXFIFO(CC1101_TXFIFO_BURST, &packet.data[0],
+			packet.length);
 	// CCA enabled: will enter TX state only if the channel is clear
 	setTxState();
 
 	// Check that TX state is being entered (state = RXTX_SETTLING)
-	while(((marcState = (readStatusReg(CC1101_MARCSTATE) & 0x1F)) <= 0x10)){
-//		dbg_printf("TX SETTLING FAIL MARCSTATE %x\n", readStatusReg(CC1101_MARCSTATE) & 0x1F);
-//
-//		return false;
-	}
 
+//	while (marcstate_get() <= 0x10) {
+//		dbg_printf("TX SETTLING FAIL MARCSTATE %x\n", marcstate_get());
+//		if (marcstate_get() == 0x01 || marcstate_get() == 0x0D) {
+//			return false;
+//			setTxState();
+//		}
+//	}
+	marcState = marcstate_get();
 	if ((marcState != 0x13) && (marcState != 0x14) && (marcState != 0x15)) {
 		setIdleState();       // Enter IDLE state
 		flushTxFifo();        // Flush Tx FIFO
-		flushRxFifo();
+//		flushRxFifo();
 		setRxState();         // Back to RX state
 
 		// Declare to be in Rx state
 		CC1101.rfState = RFSTATE_RX;
-		dbg_printf("TX FAIL MARCSTATE %x\n", readStatusReg(CC1101_MARCSTATE) & 0x1F);
+		dbg_printf("TX FAIL MARCSTATE %x\n",
+		marcstate_get());
 		return false;
 	}
 
 	// Wait for the sync word to be transmitted
-	while (!interrupt_state);
-	while (interrupt_state) ;
+	while (!interrupt_state)
+		;
+	while (interrupt_state)
+		;
 //	hw->wait_GDO0_high();
 //
 //	// Wait until the end of the packet transmission
 //	hw->wait_GDO0_low();
 	// Check that the TX FIFO is empty
-	marcState = getMarcState() & 0x1F;
+//	marcState = marcState;
 //	dbg_printf("After send %x\n",marcState);
-	if(marcState == 0x16 && !CC1101_tx_fifo_empty()){
-		flushTxFifo();
+//	if (marcState == 0x16 && !CC1101_tx_fifo_empty()) {
+//		flushTxFifo();
+//	}
 		setRxState();
-	}
 	return true;
 }
 boolean CC1101_tx_fifo_empty(void) {
@@ -487,7 +515,7 @@ boolean CC1101_rx_mode(void) {
 	// Enter RX state
 	setRxState();
 	// Check that the RX state has been entered
-	while (((marcState = readStatusReg(CC1101_MARCSTATE)) & 0x1F) != 0x0D) {
+	while (((marcState = marcstate_get()) & 0x1F) != 0x0D) {
 		if (marcState == 0x11)        // RX_OVERFLOW
 			flushRxFifo();              // flush receive queue
 
