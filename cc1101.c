@@ -481,7 +481,7 @@ boolean CC1101_sendData(CCPACKET packet) {
 		// Declare to be in Rx state
 		CC1101.rfState = RFSTATE_RX;
 		dbg_printf("TX FAIL MARCSTATE %x\n",
-		marcstate_get());
+		marcState);
 		return false;
 	}
 
