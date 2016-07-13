@@ -31,6 +31,7 @@
 
 #include "ccpacket.h"
 #include <types.h>
+#include <nosys_queue.h>
 //typedef char byte;
 //typedef char boolean;
 
@@ -347,6 +348,7 @@ struct cc1101_hw {
 	void (*packet_data_input)(unsigned char len, unsigned char *data,void *userdata);
 	void (*radio_interrupt)(u8_t state);
 	unsigned char (*spiReadRegData) (const unsigned char regAddr);
+	struct nosys_queue *recieve_queue;
 
 };
 void CC1101_init(struct cc1101_hw *hw);
