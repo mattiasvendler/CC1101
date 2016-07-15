@@ -246,7 +246,7 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 					break;
 				}
 			}
-			if (tx_curr != NULL && tx_curr->len > 0) {
+			if (tx_curr != NULL) {
 				if (radio_send(&tx_curr->data[0], tx_curr->len,
 						radio_send_done_fn, mgr) == ERR_OK) {
 					struct radio_packet_header *tx_header =
@@ -279,12 +279,12 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 			} else {
 				if (tx_curr && tx_curr->send_done_cb) {
 					tx_curr->send_done_cb(msg->value, tx_curr->userdata);
+					free_msg(tx_curr);
+					tx_curr = NULL;
 				}
-				free_msg(tx_curr);
-				tx_curr = NULL;
 				next_state = RADIO_MSG_MGR_STATE_IDLE;
 			}
-		} else if (msg->type == NOSYS_TIMER_MSG && mgr->time_in_state >= 100) {
+		} else if (mgr->time_in_state >= 100) {
 			if (tx_curr->resends < 5) {
 				next_state = RADIO_MSG_MGR_STATE_LBT;
 				tx_curr->resends++;
@@ -323,7 +323,7 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 				break;
 			}
 
-		} else if (msg->type == NOSYS_TIMER_MSG && mgr->time_in_state >= 10) {
+		} else if (msg->type == NOSYS_TIMER_MSG && mgr->time_in_state >= 100) {
 			if (tx_curr->resends <= 5) {
 				next_state = RADIO_MSG_MGR_STATE_LBT;
 				tx_curr->resends++;

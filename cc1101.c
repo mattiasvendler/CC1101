@@ -292,7 +292,6 @@ void CC1101_init(struct cc1101_hw *cc1101_hw) {
 //	CC1101_setSyncWord(&syncWord, false);
 	CC1101_setCarrierFreq(CFREQ_433);
 	CC1101_disableAddressCheck();
-	disableCCA();
 	setIdleState();
 	flushRxFifo();
 	flushTxFifo();
@@ -401,24 +400,6 @@ void CC1101_setCarrierFreq(byte freq) {
 	CC1101.carrierFreq = freq;
 }
 
-static u8_t marcstate_get(void) {
-	byte marcState = 0xFF;
-	u8_t count = 0;
-	while (1) {
-		byte m = readStatusReg(CC1101_MARCSTATE) & 0x1F;
-		if (marcState == m) {
-			if(count>3){
-				return m;
-			}
-			count ++;
-		}else{
-			count = 0;
-		}
-		marcState = m;
-	}
-
-}
-
 /**
  * sendData
  *
@@ -466,11 +447,10 @@ boolean CC1101_sendData(CCPACKET packet) {
 //		return false;
 	}
 
-	marcState = marcstate_get();
 	if ((marcState != 0x13) && (marcState != 0x14) && (marcState != 0x15)) {
 		setIdleState();       // Enter IDLE state
 		flushTxFifo();        // Flush Tx FIFO
-//		flushRxFifo();
+		flushRxFifo();
 		setRxState();         // Back to RX state
 
 		// Declare to be in Rx state
@@ -490,7 +470,7 @@ boolean CC1101_sendData(CCPACKET packet) {
 //	// Wait until the end of the packet transmission
 //	hw->wait_GDO0_low();
 	// Check that the TX FIFO is empty
-//	marcState = marcState;
+	marcState = getMarcState() & 0x1F;
 //	dbg_printf("After send %x\n",marcState);
 	if (marcState == 0x16 && !CC1101_tx_fifo_empty()) {
 		flushTxFifo();
@@ -510,7 +490,7 @@ boolean CC1101_rx_mode(void) {
 	// Enter RX state
 	setRxState();
 	// Check that the RX state has been entered
-	while (((marcState = marcstate_get()) & 0x1F) != 0x0D) {
+	while (((marcState = readStatusReg(CC1101_MARCSTATE)) & 0x1F) != 0x0D) {
 		if (marcState == 0x11)        // RX_OVERFLOW
 			flushRxFifo();              // flush receive queue
 

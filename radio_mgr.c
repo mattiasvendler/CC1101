@@ -19,8 +19,8 @@ struct cc1101_hw cc1101_hw;
 static struct packet_queue *queue;
 struct rssi_lqi status;
 #ifdef STATE_DEBUG
-static const char *state[] = {"RADIO_STATE_INIT", "RADIO_STATE_RESET",
-	"RADIO_STATE_IDLE", "RADIO_STATE_RX", "RADIO_STATE_TX"};
+static const char *state[] = { "RADIO_STATE_INIT", "RADIO_STATE_RESET",
+		"RADIO_STATE_IDLE", "RADIO_STATE_RX", "RADIO_STATE_TX" };
 #endif
 
 enum radio_state radio_state_machine(struct radio_mgr *mgr,
@@ -58,8 +58,8 @@ enum radio_state radio_state_machine(struct radio_mgr *mgr,
 		}
 		break;
 	case RADIO_STATE_IDLE:
-		if (msg->type == NOSYS_MSG_STATE) {
-			if ((getMarcState() & 0x1F) != 0x0D) {
+		if(msg->type == NOSYS_MSG_STATE){
+			if((getMarcState() & 0x1F) != 0x0D){
 				CC1101_rx_mode();
 			}
 		}
@@ -81,7 +81,7 @@ enum radio_state radio_state_machine(struct radio_mgr *mgr,
 
 			}
 			next_state = RADIO_STATE_IDLE;
-		} else if (msg->type == NOSYS_TIMER_MSG && mgr->time_in_state > 10) {
+		}else if(msg->type == NOSYS_TIMER_MSG && mgr->time_in_state > 10){
 			next_state = RADIO_STATE_IDLE;
 		}
 		break;
@@ -100,25 +100,22 @@ enum radio_state radio_state_machine(struct radio_mgr *mgr,
 
 				current_packet = NULL;
 
-			} else {
-				if (current_packet && current_packet->radio_send_done_fn) {
-					current_packet->radio_send_done_fn(1,
-							current_packet->userdata);
-
+				if ((getMarcState() & 0x1F) == 0x11) {
+					next_state = RADIO_STATE_RX;
+					break;
 				}
+				next_state = RADIO_STATE_IDLE;
+			}
+		} else if(msg->type == NOSYS_MSG_RADIO_NOTIFY){
+			if (current_packet && current_packet->radio_send_done_fn) {
+				current_packet->radio_send_done_fn(1,
+						current_packet->userdata);
 
 			}
 			next_state = RADIO_STATE_IDLE;
+			current_packet = NULL;
 		}
-//		else if(msg->type == NOSYS_MSG_RADIO_NOTIFY){
-//			if (current_packet && current_packet->radio_send_done_fn) {
-//				current_packet->radio_send_done_fn(1,
-//						current_packet->userdata);
-//
-//			}
-//			next_state = RADIO_STATE_IDLE;
-//			current_packet = NULL;
-//		}
+
 
 		break;
 	}
@@ -189,17 +186,16 @@ void radio_fn() {
 
 		if (msg->type == NOSYS_TIMER_MSG) {
 			mgr->time_in_state++;
+			if (mgr->state == RADIO_STATE_IDLE) {
+				if ((getMarcState() & 0x1F) == 0x11) {
+					flushRxFifo();
+					setRxState();
+				}
+			}
 		} else if (msg->type == NOSYS_MSG_RADIO_RESET) {
 			msg->type = NOSYS_MSG_STATE;
 			mgr->state = RADIO_STATE_RESET;
 			mgr->reset_queue = msg->ptr;
-		} else if (msg->type == NOSYS_MSG_RADIO_NOTIFY) {
-			if (mgr->state == RADIO_STATE_TX) {
-				skip_state = 1;
-			} else if (mgr->state == RADIO_STATE_RX) {
-				nosys_msg_postpone(mgr->inq, msg);
-				skip_state = 1;
-			}
 		}
 
 		if (!skip_state) {
