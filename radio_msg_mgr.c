@@ -368,7 +368,7 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 					lbt_fail++;
 					dbg_printf("LBT fail rssi %d count %d\n", status.rssi,
 							lbt_fail);
-					if (lbt_fail == 100) {
+					if (lbt_fail == 5) {
 						lbt_fail = 0;
 						next_state = RADIO_MSG_MGR_STATE_RESET;
 					} else {

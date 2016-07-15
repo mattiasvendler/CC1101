@@ -441,7 +441,7 @@ boolean CC1101_sendData(CCPACKET packet) {
 	setTxState();
 
 	// Check that TX state is being entered (state = RXTX_SETTLING)
-	while(((marcState = (readStatusReg(CC1101_MARCSTATE) & 0x1F)) <= 0x10)){
+	while (((marcState = (readStatusReg(CC1101_MARCSTATE) & 0x1F)) <= 0x10)) {
 //		dbg_printf("TX SETTLING FAIL MARCSTATE %x\n", readStatusReg(CC1101_MARCSTATE) & 0x1F);
 
 //		return false;
@@ -470,12 +470,13 @@ boolean CC1101_sendData(CCPACKET packet) {
 //	// Wait until the end of the packet transmission
 //	hw->wait_GDO0_low();
 	// Check that the TX FIFO is empty
-	marcState = getMarcState() & 0x1F;
+//	marcState = getMarcState() & 0x1F;
 //	dbg_printf("After send %x\n",marcState);
-	if (marcState == 0x16 && !CC1101_tx_fifo_empty()) {
-		flushTxFifo();
-		setRxState();
-	}
+//	if (marcState == 0x16 && !CC1101_tx_fifo_empty()) {
+	setIdleState();
+	flushTxFifo();
+	setRxState();
+//	}
 	return true;
 }
 boolean CC1101_tx_fifo_empty(void) {
