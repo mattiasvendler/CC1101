@@ -192,7 +192,7 @@ void radio_fn() {
 					setRxState();
 				}
 			}
-		} else if (msg->type == NOSYS_MSG_RADIO_RESET) {
+		} else if (msg->type == NOSYS_MSG_RADIO_RESET || (mgr->time_in_state > 100 && CC1101_interrupt_pin_state()>0)) {
 			msg->type = NOSYS_MSG_STATE;
 			mgr->state = RADIO_STATE_RESET;
 			mgr->reset_queue = msg->ptr;

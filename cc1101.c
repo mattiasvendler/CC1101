@@ -567,3 +567,6 @@ void CC1101_interrupt(u8_t state) {
 	}
 
 }
+u8_t CC1101_interrupt_pin_state(){
+	return interrupt_state;
+}
