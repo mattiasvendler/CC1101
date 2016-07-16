@@ -520,9 +520,7 @@ byte CC1101_receiveData(CCPACKET * packet) {
 	byte val;
 	// Rx FIFO overflow?
 	if (((val = readStatusReg(CC1101_MARCSTATE)) & 0x1F) == 0x11) {
-		setIdleState();       // Enter IDLE state
 		flushRxFifo();        // Flush Rx FIFO
-		//CC1101_cmdStrobe(CC1101_SFSTXON);
 		packet->length = 0;
 	}
 	// Any byte waiting to be read?
@@ -548,11 +546,6 @@ byte CC1101_receiveData(CCPACKET * packet) {
 	} else {
 		packet->length = 0;
 	}
-//	if (!packet->crc_ok) {
-	//Always flush rx fifo
-	flushRxFifo();
-//	}
-//	CC1101_cmdStrobe(CC1101_SRX);
 	// Back to RX state
 	setRxState();
 

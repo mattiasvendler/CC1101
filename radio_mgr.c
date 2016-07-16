@@ -52,17 +52,18 @@ enum radio_state radio_state_machine(struct radio_mgr *mgr,
 				if (mgr->reset_queue) {
 					post_msg(mgr->reset_queue, NOSYS_MSG_RADIO_RESET_DONE);
 				}
+				mgr->reset_queue = NULL;
 				dbg_printf("Reset done\n");
 				next_state = RADIO_STATE_IDLE;
 			}
 		}
 		break;
 	case RADIO_STATE_IDLE:
-		if(msg->type == NOSYS_MSG_STATE){
-			if((getMarcState() & 0x1F) != 0x0D){
-				CC1101_rx_mode();
-			}
-		}
+//		if(msg->type == NOSYS_MSG_STATE){
+//			if((getMarcState() & 0x1F) != 0x0D){
+//				CC1101_rx_mode();
+//			}
+//		}
 		if (msg->type == NOSYS_MSG_RADIO_NOTIFY) {
 			next_state = RADIO_STATE_RX;
 		} else if (current_packet) {
@@ -192,10 +193,15 @@ void radio_fn() {
 					setRxState();
 				}
 			}
-		} else if (msg->type == NOSYS_MSG_RADIO_RESET || (mgr->time_in_state > 100 && CC1101_interrupt_pin_state()>0)) {
+		} else if (msg->type == NOSYS_MSG_RADIO_RESET ) {
 			msg->type = NOSYS_MSG_STATE;
 			mgr->state = RADIO_STATE_RESET;
 			mgr->reset_queue = msg->ptr;
+		}else if(mgr->time_in_state > 100 && CC1101_interrupt_pin_state()>0){
+			msg->type = NOSYS_MSG_STATE;
+			mgr->state = RADIO_STATE_RESET;
+			mgr->reset_queue = NULL;
+
 		}
 
 		if (!skip_state) {
