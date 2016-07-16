@@ -460,11 +460,27 @@ boolean CC1101_sendData(CCPACKET packet) {
 		return false;
 	}
 
+	do{
+		marcState = (readStatusReg(CC1101_MARCSTATE) & 0x1F);
+		if (marcState == 0x11) {        // RX_OVERFLOW
+			setIdleState();       // Enter IDLE state
+			flushRxFifo();		  // Flush Rx FIFO
+			setRxState();         // Back to RX state
+			return false;
+		}
+//		if (marcState == 0x16) {        // TX_UNDERFLOW
+//			setIdleState();       // Enter IDLE state
+//			flushTxFifo();        // Flush Tx FIFO
+//			setRxState();         // Back to RX state
+//			return false;
+//		}
+
+	}while(marcState > 0x01);
 	// Wait for the sync word to be transmitted
-	while (!interrupt_state)
-		;
-	while (interrupt_state)
-		;
+//	while (!interrupt_state)
+//		;
+//	while (interrupt_state)
+//		;
 //	hw->wait_GDO0_high();
 //
 //	// Wait until the end of the packet transmission
@@ -473,8 +489,8 @@ boolean CC1101_sendData(CCPACKET packet) {
 //	marcState = getMarcState() & 0x1F;
 //	dbg_printf("After send %x\n",marcState);
 //	if (marcState == 0x16 && !CC1101_tx_fifo_empty()) {
-	setIdleState();
-	flushTxFifo();
+//	setIdleState();
+//	flushTxFifo();
 	setRxState();
 //	}
 	return true;
