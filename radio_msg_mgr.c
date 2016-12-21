@@ -26,6 +26,7 @@ static struct radio_msg_send_queue msg_buf[RADIO_MSG_SEND_QUEUE_SIZE];
 static u8_t msg_buf_size = RADIO_MSG_SEND_QUEUE_SIZE;
 static u8_t msg_free[RADIO_MSG_SEND_QUEUE_SIZE];
 #define RSSI_OK (-84)
+#define STATE_DEBUG
 #ifdef STATE_DEBUG
 static const char *states[] = {"INIT", "RESET", "IDLE", "RX", "RX_ACK",
 	"RX_ACK_DONE", "TX", "TX_DONE", "TX_ACK", "LBT"
@@ -86,8 +87,8 @@ static void radio_send_ack_done_fn(unsigned int res, void *userdata) {
 static void print_packege(struct radio_packet_header *h) {
 #ifdef STATE_DEBUG
 	dbg_printf("Package:");
-	dbg_printf("SOURCE: %x\n", h->source);
-	dbg_printf("TARGET: %x\n", h->target);
+	dbg_printf("SOURCE: %x\n", htonl(h->source));
+	dbg_printf("TARGET: %x\n", htonl(h->target));
 	dbg_printf("SEQ %d\n", htons(h->seq));
 	dbg_printf("CRC %x\n", h->crc);
 	dbg_printf("length %d\n", h->length);
@@ -214,7 +215,7 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 			h->length = 0;
 			h->flags |= 0x80;
 			h->flags &= ~0x10;
-			print_packege(h);
+//			print_packege(h);
 		} else if (msg->type == NOSYS_TIMER_MSG && mgr->time_in_state > 10) {
 			if (radio_send(&rx_buff[0], sizeof(struct radio_packet_header),
 					radio_send_ack_done_fn, mgr) == ERR_OK) {
@@ -249,9 +250,9 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 			if (tx_curr != NULL) {
 				if (radio_send(&tx_curr->data[0], tx_curr->len,
 						radio_send_done_fn, mgr) == ERR_OK) {
-					struct radio_packet_header *tx_header =
-							(struct radio_packet_header *) &tx_curr->data[0];
-					print_packege(tx_header);
+//					struct radio_packet_header *tx_header =
+//							(struct radio_packet_header *) &tx_curr->data[0];
+//					print_packege(tx_header);
 					next_state = RADIO_MSG_MGR_STATE_TX_DONE;
 				} else {
 					if (tx_curr->send_done_cb) {
@@ -309,7 +310,7 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 					(struct radio_packet_header *) &rx_buff[0];
 			struct radio_packet_header *tx_header =
 					(struct radio_packet_header *) &tx_curr->data[0];
-			print_packege(h);
+//			print_packege(h);
 			if (h->target == htonl(mgr->local_address)
 					&& h->seq == tx_header->seq && (h->flags & 0x80) > 0) {
 				if (tx_curr->send_done_cb) {
