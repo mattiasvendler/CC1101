@@ -45,7 +45,7 @@ struct radio_mgr{
 	struct nosys_queue *inq;
 	struct nosys_timer *timer;
 	enum radio_state state;
-	unsigned short time_in_state;
+	u32_t time_in_state;
 	void *userdata;
 	struct nosys_queue *reset_queue;
 	void (*radio_mgr_data_recieved_fn)(u8_t *data,u8_t len,void *user_data);

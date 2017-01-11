@@ -441,60 +441,44 @@ boolean CC1101_sendData(CCPACKET packet) {
 	setTxState();
 
 	// Check that TX state is being entered (state = RXTX_SETTLING)
-	while (((marcState = (readStatusReg(CC1101_MARCSTATE) & 0x1F)) <= 0x10)) {
-//		dbg_printf("TX SETTLING FAIL MARCSTATE %x\n", readStatusReg(CC1101_MARCSTATE) & 0x1F);
-
-//		return false;
+	u16_t spinn_check = 0;
+	while (((marcState = (readStatusReg(CC1101_MARCSTATE) & 0x1F)) < 0x10)) {
+		if(spinn_check++ == 250)
+			return false;
 	}
 
 	if ((marcState != 0x13) && (marcState != 0x14) && (marcState != 0x15)) {
 		setIdleState();       // Enter IDLE state
 		flushTxFifo();        // Flush Tx FIFO
-		flushRxFifo();
 		setRxState();         // Back to RX state
 
 		// Declare to be in Rx state
 		CC1101.rfState = RFSTATE_RX;
-		dbg_printf("TX FAIL MARCSTATE %x\n",
-		readStatusReg(CC1101_MARCSTATE) & 0x1F);
 		return false;
 	}
 
-	do{
-		marcState = (readStatusReg(CC1101_MARCSTATE) & 0x1F);
-		if (marcState == 0x11) {        // RX_OVERFLOW
-			setIdleState();       // Enter IDLE state
-			flushRxFifo();		  // Flush Rx FIFO
-			setRxState();         // Back to RX state
+	// Wait for the sync word to be transmitted
+	spinn_check =0;
+	while (!interrupt_state){
+		if(spinn_check++ == 12500){
+			dbg_printf("spinn1 check fail %x\n",interrupt_state);
+			setRxState();
 			return false;
 		}
-//		if (marcState == 0x16) {        // TX_UNDERFLOW
-//			setIdleState();       // Enter IDLE state
-//			flushTxFifo();        // Flush Tx FIFO
-//			setRxState();         // Back to RX state
-//			return false;
-//		}
+	}
+	spinn_check = 0;
+	while (interrupt_state){
+		if(spinn_check++ == 12500){
+			dbg_printf("spinn2 check fail %x\n",interrupt_state);
+			setRxState();
+			return false;
+		}
+	}
 
-	}while(marcState > 0x01);
-	// Wait for the sync word to be transmitted
-//	while (!interrupt_state)
-//		;
-//	while (interrupt_state)
-//		;
-//	hw->wait_GDO0_high();
-//
-//	// Wait until the end of the packet transmission
-//	hw->wait_GDO0_low();
-	// Check that the TX FIFO is empty
-//	marcState = getMarcState() & 0x1F;
-//	dbg_printf("After send %x\n",marcState);
-//	if (marcState == 0x16 && !CC1101_tx_fifo_empty()) {
-//	setIdleState();
-//	flushTxFifo();
 	setRxState();
-//	}
 	return true;
 }
+
 boolean CC1101_tx_fifo_empty(void) {
 	if ((readStatusReg(CC1101_TXBYTES) & 0x7F) == 0) {
 		return true;
@@ -502,6 +486,7 @@ boolean CC1101_tx_fifo_empty(void) {
 	return false;
 
 }
+
 boolean CC1101_rx_mode(void) {
 	byte marcState;
 	// Enter RX state
@@ -513,8 +498,6 @@ boolean CC1101_rx_mode(void) {
 
 		if (marcState == 0x16)        // TX_UNDERFLOW
 			flushTxFifo();              // flush receive queue
-
-//		dbg_printf("set rx mode fail MARCSTATE %x \n", marcState);
 
 		return false;
 	}

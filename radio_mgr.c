@@ -18,9 +18,10 @@ struct cc1101_hw cc1101_hw;
 #define RESET_TIME_IN_STATE mgr->time_in_state = 0
 static struct packet_queue *queue;
 struct rssi_lqi status;
+//#define STATE_DEBUG
 #ifdef STATE_DEBUG
-static const char *state[] = { "RADIO_STATE_INIT", "RADIO_STATE_RESET",
-		"RADIO_STATE_IDLE", "RADIO_STATE_RX", "RADIO_STATE_TX" };
+static const char *state[] = {"RADIO_INIT", "RADIO_RESET",
+	"RADIO_IDLE", "RADIO_RX", "RADIO_TX"};
 #endif
 
 enum radio_state radio_state_machine(struct radio_mgr *mgr,
@@ -37,14 +38,12 @@ enum radio_state radio_state_machine(struct radio_mgr *mgr,
 
 			}
 			CC1101_init(&cc1101_hw);
-			dbg_printf("Reset radio start\n");
 
 			queue = NULL;
 			current_packet = NULL;
 		} else if (msg->type == NOSYS_TIMER_MSG) {
 			byte marcState = (getMarcState() & 0x1F);
 			if (marcState == 0x0D) {
-				dbg_printf("MARCSTATE in reset %x\n", marcState);
 				if (mgr->enable_interrupt) {
 					mgr->enable_interrupt();
 				}
@@ -52,22 +51,26 @@ enum radio_state radio_state_machine(struct radio_mgr *mgr,
 				if (mgr->reset_queue) {
 					post_msg(mgr->reset_queue, NOSYS_MSG_RADIO_RESET_DONE);
 				}
-				mgr->reset_queue = NULL;
 				dbg_printf("Reset done\n");
 				next_state = RADIO_STATE_IDLE;
 			}
 		}
 		break;
 	case RADIO_STATE_IDLE:
-//		if(msg->type == NOSYS_MSG_STATE){
-//			if((getMarcState() & 0x1F) != 0x0D){
-//				CC1101_rx_mode();
-//			}
-//		}
+		if (msg->type == NOSYS_MSG_STATE) {
+			if ((getMarcState() & 0x1F) != 0x0D) {
+				CC1101_rx_mode();
+			}
+		}
 		if (msg->type == NOSYS_MSG_RADIO_NOTIFY) {
 			next_state = RADIO_STATE_RX;
 		} else if (current_packet) {
 			next_state = RADIO_STATE_TX;
+		} else if (msg->type == NOSYS_TIMER_MSG) {
+			if ((mgr->time_in_state % 200 == 0)
+					&& ((getMarcState() & 0x1F) != 0x0D)) {
+				next_state = RADIO_STATE_RESET;
+			}
 		}
 		break;
 	case RADIO_STATE_RX:
@@ -82,7 +85,7 @@ enum radio_state radio_state_machine(struct radio_mgr *mgr,
 
 			}
 			next_state = RADIO_STATE_IDLE;
-		}else if(msg->type == NOSYS_TIMER_MSG && mgr->time_in_state > 10){
+		} else if (msg->type == NOSYS_TIMER_MSG && mgr->time_in_state > 20) {
 			next_state = RADIO_STATE_IDLE;
 		}
 		break;
@@ -100,23 +103,25 @@ enum radio_state radio_state_machine(struct radio_mgr *mgr,
 				}
 
 				current_packet = NULL;
-
-				if ((getMarcState() & 0x1F) == 0x11) {
-					next_state = RADIO_STATE_RX;
-					break;
-				}
 				next_state = RADIO_STATE_IDLE;
 			}
-		} else if(msg->type == NOSYS_MSG_RADIO_NOTIFY){
+		} else if (msg->type == NOSYS_MSG_RADIO_NOTIFY) {
 			if (current_packet && current_packet->radio_send_done_fn) {
-				current_packet->radio_send_done_fn(1,
-						current_packet->userdata);
-
+				current_packet->radio_send_done_fn(1, current_packet->userdata);
 			}
 			next_state = RADIO_STATE_IDLE;
 			current_packet = NULL;
-		}
+		} else if (msg->type == NOSYS_TIMER_MSG && mgr->time_in_state > 30) {
+			if (current_packet && current_packet->radio_send_done_fn) {
+				dbg_printf("Tx timeout %d\n", mgr->time_in_state);
+				current_packet->radio_send_done_fn(0, current_packet->userdata);
+			}
 
+			next_state = RADIO_STATE_IDLE;
+		} else {
+			next_state = RADIO_STATE_IDLE;
+			current_packet = NULL;
+		}
 
 		break;
 	}
@@ -154,17 +159,11 @@ void radio_link_status(struct rssi_lqi *status) {
 	}
 }
 void radio_notify(struct radio_mgr *mgr) {
-	if (mgr->state == RADIO_STATE_TX) {
-
-	} else if (mgr->state == RADIO_STATE_IDLE) {
+	if (mgr->state == RADIO_STATE_IDLE) {
 		mgr->state = RADIO_STATE_RX;
 	}
 }
-#ifdef LINUX
-static void radio_mgr_timer_cb(void) {
-	radio_fn();
-}
-#endif
+
 void radio_init() {
 	radio_mgr.state = RADIO_STATE_INIT;
 	current_packet = NULL;
@@ -186,18 +185,15 @@ void radio_fn() {
 	if (msg) {
 
 		if (msg->type == NOSYS_TIMER_MSG) {
-			mgr->time_in_state++;
-			if (mgr->state == RADIO_STATE_IDLE) {
-				if ((getMarcState() & 0x1F) == 0x11) {
-					flushRxFifo();
-					setRxState();
-				}
+			if (mgr->time_in_state < 0xFFFF) {
+				mgr->time_in_state++;
 			}
-		} else if (msg->type == NOSYS_MSG_RADIO_RESET ) {
+
+		} else if (msg->type == NOSYS_MSG_RADIO_RESET) {
 			msg->type = NOSYS_MSG_STATE;
 			mgr->state = RADIO_STATE_RESET;
 			mgr->reset_queue = msg->ptr;
-		}else if(mgr->time_in_state > 100 && CC1101_interrupt_pin_state()>0){
+		} else if (mgr->time_in_state > 100 && mgr->state != RADIO_STATE_IDLE) {
 			msg->type = NOSYS_MSG_STATE;
 			mgr->state = RADIO_STATE_RESET;
 			mgr->reset_queue = NULL;
@@ -211,13 +207,15 @@ void radio_fn() {
 					break;
 				}
 #ifdef STATE_DEBUG
-				DBG("%s -> %s\n", state[mgr->state], state[next_state]);
+				DBG("%s -> %s\n", state[mgr->state], state[next_state])
+				;
 #endif
 				mgr->state = next_state;
 				mgr->time_in_state = 0;
 				msg->type = NOSYS_MSG_STATE;
 			}
 		}
+
 		nosys_queue_msg_destroy(msg);
 
 	}

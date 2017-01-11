@@ -23,6 +23,7 @@ enum radio_msg_mgr_state {
 	RADIO_MSG_MGR_STATE_TX_DONE,
 	RADIO_MSG_MGR_STATE_TX_ACK,
 	RADIO_MSG_MGR_STATE_LBT,
+	RADIO_MSG_MGR_STATE_END,
 };
 struct radio_msg_send_queue {
 	u8_t data[61];
@@ -42,10 +43,11 @@ struct radio_msg_mgr {
 			void *userdata);
 	u32_t time_in_state;
 	u32_t local_address;
+	u8_t handle_broadcast;
 
 };
 
-void radio_msg_mgr_init(struct radio_msg_mgr *mgr, u32_t local_address);
+void radio_msg_mgr_init(struct radio_msg_mgr *mgr, u32_t local_address,u8_t handle_broadcast);
 void radio_msg_mgr_fn(void);
 void radio_msg_mgr_data_recieved_cb(unsigned char *data, unsigned char len,
 		unsigned char rssi, unsigned char lqi, void *userdata);
