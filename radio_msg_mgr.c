@@ -167,6 +167,8 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 			free_msg(tx_curr);
 			tx_curr = NULL;
 			rx_len = 0;
+			mgr->rx_led_on();
+			mgr->tx_led_on();
 		} else if (msg->type == NOSYS_MSG_RADIO_RESET_DONE) {
 			next_state = RADIO_MSG_MGR_STATE_IDLE;
 		} else if (msg->type == NOSYS_TIMER_MSG && mgr->time_in_state > 1000) {
@@ -177,15 +179,22 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 	case RADIO_MSG_MGR_STATE_IDLE:
 		if (msg->type == NOSYS_MSG_STATE) {
 			rx_len = 0;
+			if (mgr->tx_led_off)
+				mgr->tx_led_off();
+
+			if (mgr->rx_led_off)
+				mgr->rx_led_off();
 		} else if (msg->type == NOSYS_MSG_RADIO_RECIEVED_DATA) {
 			next_state = RADIO_MSG_MGR_STATE_RX;
-		} else if ((msg->type == NOSYS_TIMER_MSG)
-				&& (tx_curr != NULL )) {
+		} else if ((msg->type == NOSYS_TIMER_MSG) && (tx_curr != NULL )) {
 			next_state = RADIO_MSG_MGR_STATE_LBT;
 		}
 		break;
 	case RADIO_MSG_MGR_STATE_RX:
 		if (msg->type == NOSYS_MSG_STATE) {
+			if (mgr->rx_led_on)
+				mgr->rx_led_on();
+
 			u8_t *msg_data = &rx_buff[sizeof(struct radio_packet_header)];
 			struct radio_packet_header *h =
 					(struct radio_packet_header *) &rx_buff[0];
@@ -330,6 +339,9 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 		break;
 	case RADIO_MSG_MGR_STATE_LBT:
 		if (msg->type == NOSYS_MSG_STATE) {
+			if (mgr->tx_led_on)
+				mgr->tx_led_on();
+
 			radio_link_status(&status);
 			if (status.rssi <= RSSI_OK) {
 //				dbg_printf("LBT ok rssi=%d\n", status.rssi);
@@ -375,6 +387,7 @@ void radio_msg_mgr_fn(void) {
 	struct nosys_msg *msg = nosys_msg_get();
 	u8_t skip_state = 0;
 	if (msg->type == NOSYS_TIMER_MSG) {
+
 		if (mgr->time_in_state < 0xFFFFFFFF) {
 			mgr->time_in_state++;
 		}

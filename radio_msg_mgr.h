@@ -44,6 +44,10 @@ struct radio_msg_mgr {
 	u32_t time_in_state;
 	u32_t local_address;
 	u8_t handle_broadcast;
+	void (*tx_led_on)(void);
+	void (*tx_led_off)(void);
+	void (*rx_led_on)(void);
+	void (*rx_led_off)(void);
 
 };
 
