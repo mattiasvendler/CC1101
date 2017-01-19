@@ -51,7 +51,7 @@ enum radio_state radio_state_machine(struct radio_mgr *mgr,
 				if (mgr->reset_queue) {
 					post_msg(mgr->reset_queue, NOSYS_MSG_RADIO_RESET_DONE);
 				}
-				dbg_printf("Reset done\n");
+//				dbg_printf("Reset done\n");
 				next_state = RADIO_STATE_IDLE;
 			}
 		}
@@ -64,12 +64,14 @@ enum radio_state radio_state_machine(struct radio_mgr *mgr,
 		}
 		if (msg->type == NOSYS_MSG_RADIO_NOTIFY) {
 			next_state = RADIO_STATE_RX;
-		} else if (current_packet) {
+		}else if(current_packet){
 			next_state = RADIO_STATE_TX;
 		} else if (msg->type == NOSYS_TIMER_MSG) {
 			if ((mgr->time_in_state % 200 == 0)
 					&& ((getMarcState() & 0x1F) != 0x0D)) {
 				next_state = RADIO_STATE_RESET;
+			} else if(current_packet){
+				next_state = RADIO_STATE_TX;
 			}
 		}
 		break;
@@ -84,8 +86,6 @@ enum radio_state radio_state_machine(struct radio_mgr *mgr,
 				}
 
 			}
-			next_state = RADIO_STATE_IDLE;
-		} else if (msg->type == NOSYS_TIMER_MSG && mgr->time_in_state > 20) {
 			next_state = RADIO_STATE_IDLE;
 		}
 		break;
@@ -111,9 +111,8 @@ enum radio_state radio_state_machine(struct radio_mgr *mgr,
 			}
 			next_state = RADIO_STATE_IDLE;
 			current_packet = NULL;
-		} else if (msg->type == NOSYS_TIMER_MSG && mgr->time_in_state > 30) {
+		} else if (msg->type == NOSYS_TIMER_MSG && mgr->time_in_state > 10) {
 			if (current_packet && current_packet->radio_send_done_fn) {
-				dbg_printf("Tx timeout %d\n", mgr->time_in_state);
 				current_packet->radio_send_done_fn(0, current_packet->userdata);
 			}
 
@@ -192,11 +191,11 @@ void radio_fn() {
 		} else if (msg->type == NOSYS_MSG_RADIO_RESET) {
 			msg->type = NOSYS_MSG_STATE;
 			mgr->state = RADIO_STATE_RESET;
-			mgr->reset_queue = msg->ptr;
-		} else if (mgr->time_in_state > 100 && mgr->state != RADIO_STATE_IDLE) {
+//			mgr->reset_queue = msg->ptr;
+		} else if (mgr->time_in_state > 10 && mgr->state != RADIO_STATE_IDLE) {
 			msg->type = NOSYS_MSG_STATE;
 			mgr->state = RADIO_STATE_RESET;
-			mgr->reset_queue = NULL;
+//			mgr->reset_queue = NULL;
 
 		}
 

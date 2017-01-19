@@ -20,6 +20,7 @@
 #define CMD_PING_PONG_MSG  			0x05
 #define CMD_PERIODIC_STATUS			0x06
 #define CMD_TEMPERATURE_MSG			0x07
+#define CMD_TEMPERATURE_SAMPLE_RATE 0x08
 
 #define htons(A) ((((A) & 0xff00) >> 8) | (((A) & 0x00ff) << 8))
 

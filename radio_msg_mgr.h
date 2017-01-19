@@ -48,6 +48,7 @@ struct radio_msg_mgr {
 	void (*tx_led_off)(void);
 	void (*rx_led_on)(void);
 	void (*rx_led_off)(void);
+	bool_t (*node_allowed)(u32_t nodeid);
 
 };
 

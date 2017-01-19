@@ -461,7 +461,6 @@ boolean CC1101_sendData(CCPACKET packet) {
 	spinn_check =0;
 	while (!interrupt_state){
 		if(spinn_check++ == 12500){
-			dbg_printf("spinn1 check fail %x\n",interrupt_state);
 			setRxState();
 			return false;
 		}
@@ -469,7 +468,6 @@ boolean CC1101_sendData(CCPACKET packet) {
 	spinn_check = 0;
 	while (interrupt_state){
 		if(spinn_check++ == 12500){
-			dbg_printf("spinn2 check fail %x\n",interrupt_state);
 			setRxState();
 			return false;
 		}
