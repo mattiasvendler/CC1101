@@ -78,13 +78,14 @@ void radio_msg_mgr_data_recieved_cb(unsigned char *data, unsigned char len,
 			memcpy(&rx_buff[0], data, len);
 			nosys_queue_add_last(mgr->inq, msg);
 
-
-
-
 		}
 	}
 }
+void radio_msg_mgr_reset(struct radio_msg_mgr *mgr) {
+	mgr->state = RADIO_MSG_MGR_STATE_INIT;
+	mgr->time_in_state = 0;
 
+}
 void radio_msg_mgr_init(struct radio_msg_mgr *mgr, u32_t local_address,
 		u8_t handle_broadcast) {
 	mgr->state = RADIO_MSG_MGR_STATE_INIT;
@@ -167,15 +168,18 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 			u8_t *msg_data = &rx_buff[sizeof(struct radio_packet_header)];
 			struct radio_packet_header *h =
 					(struct radio_packet_header *) &rx_buff[0];
+			if (mgr->radio_recieved_cb) {
+				mgr->radio_recieved_cb(
+						sizeof(struct radio_packet_header) + h->length,
+						&rx_buff[0], mgr->user);
+			}
 
-			if ((h->target == mgr->local_address
-					&& mgr->node_allowed(h->source))
+			if ((h->target == mgr->local_address && mgr->node_allowed(h->source))
 					|| (h->target == 0xFFFFFFFF)) {
 
 				s32_t res = ERR_OK;
 
-				if (mgr->handle_ctrl_msg_cb
-						&& (((h->flags & 0x60) >> 5) & RADIO_MSG_CTRL) > 0) {
+				if (mgr->handle_ctrl_msg_cb) {
 					res = mgr->handle_ctrl_msg_cb(h->source, h->msg_type,
 							msg_data, rx_len - 14, mgr->user);
 				}
@@ -280,11 +284,16 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 					(struct radio_packet_header *) &rx_buff[0];
 			struct radio_packet_header *tx_header =
 					(struct radio_packet_header *) &tx_curr->data[0];
-			if (h->target == mgr->local_address
-					&& h->seq == tx_header->seq && (h->flags & 0x80) > 0) {
+			if (h->target == mgr->local_address && h->seq == tx_header->seq
+					&& (h->flags & 0x80) > 0) {
 				if (tx_curr && tx_curr->send_done_cb) {
 					tx_curr->send_done_cb(1, tx_curr->userdata);
 					tx_curr = NULL;
+				}
+				if (mgr->radio_recieved_cb) {
+					mgr->radio_recieved_cb(
+							sizeof(struct radio_packet_header) + h->length,
+							&rx_buff[0], mgr->user);
 				}
 				next_state = RADIO_MSG_MGR_STATE_IDLE;
 				break;
@@ -293,15 +302,14 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 		} else if (msg->type == NOSYS_TIMER_MSG && mgr->time_in_state >= 10) {
 			if (tx_curr->resends < 5) {
 				tx_curr->resends++;
-				next_state = RADIO_MSG_MGR_STATE_IDLE;
 			} else {
 				if (tx_curr && tx_curr->send_done_cb) {
 //					dbg_printf("Resend %d\n", tx_curr->resends);
 					tx_curr->send_done_cb(0, tx_curr->userdata);
 					tx_curr = NULL;
 				}
-				next_state = RADIO_MSG_MGR_STATE_IDLE;
 			}
+			next_state = RADIO_MSG_MGR_STATE_IDLE;
 		}
 		break;
 	case RADIO_MSG_MGR_STATE_LBT:
@@ -361,6 +369,7 @@ void radio_msg_mgr_fn(void) {
 			mgr->state = RADIO_MSG_MGR_STATE_RESET;
 			mgr->time_in_state = 0;
 			msg->type = NOSYS_MSG_STATE;
+			dbg_printf("TIMEOUT\n");
 		}
 
 	} else if (msg->type == NOSYS_MSG_RADIO_RESET_DONE) {

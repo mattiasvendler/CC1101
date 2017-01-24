@@ -49,6 +49,7 @@ struct radio_msg_mgr {
 	void (*rx_led_on)(void);
 	void (*rx_led_off)(void);
 	bool_t (*node_allowed)(u32_t nodeid);
+	void (*radio_recieved_cb)(u8_t len, u8_t *data, void *userdata);
 
 };
 
@@ -58,5 +59,5 @@ void radio_msg_mgr_data_recieved_cb(unsigned char *data, unsigned char len,
 		unsigned char rssi, unsigned char lqi, void *userdata);
 s32_t radio_msg_send(void *data, u8_t len, u8_t require_ack, void *userdata,
 		void (*send_done_cb)(s32_t res, void *userdata));
-
+void radio_msg_mgr_reset(struct radio_msg_mgr *mgr);
 #endif /* SRC_RADIO_RADIO_MSG_MGR_H_ */
