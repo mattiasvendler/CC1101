@@ -114,6 +114,7 @@ s32_t radio_msg_send(void *data, u8_t len, u8_t require_ack, void *userdata,
 			tx_curr->len = len;
 			tx_curr->require_ack = require_ack;
 			tx_curr->next = NULL;
+			tx_curr->resends = 0;
 		} else {
 			dbg_printf("Failed to alloc in state %d\n", local_mgr->state);
 			return -1;
