@@ -366,6 +366,7 @@ byte CC1101_readReg(byte regAddr, byte regType) ;
 void CC1101_readBurstReg(byte * buffer, byte regAddr, byte len);
 void CC1101_interrupt(u8_t state);
 u8_t CC1101_interrupt_pin_state(void);
+void CC1101_task_fn(void);
 
 
 
