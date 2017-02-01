@@ -87,7 +87,7 @@ enum radio_state radio_state_machine(struct radio_mgr *mgr,
 	case RADIO_STATE_TX: {
 		if (msg->type == NOSYS_MSG_STATE) {
 			if (current_packet == NULL) {
-				next_state = RADIO_STATE_IDLE;
+				next_state = RADIO_STATE_RESET;
 				break;
 
 			}
@@ -167,6 +167,8 @@ void radio_init() {
 void radio_mgr_reset(void *mgr, void *reply_queue) {
 	struct radio_mgr *radio_mgr = (struct radio_mgr *) mgr;
 	struct nosys_msg *msg = nosys_queue_create_msg();
+	if(!msg) return;
+
 	msg->type = NOSYS_MSG_RADIO_RESET;
 	msg->ptr = reply_queue;
 
@@ -186,11 +188,9 @@ void radio_fn() {
 		} else if (msg->type == NOSYS_MSG_RADIO_RESET) {
 			msg->type = NOSYS_MSG_STATE;
 			mgr->state = RADIO_STATE_RESET;
-//			mgr->reset_queue = msg->ptr;
 		} else if (mgr->time_in_state > 10 && mgr->state != RADIO_STATE_IDLE) {
 			msg->type = NOSYS_MSG_STATE;
 			mgr->state = RADIO_STATE_RESET;
-//			mgr->reset_queue = NULL;
 
 		}
 
