@@ -16,6 +16,7 @@
 #include <nosys_queue.h>
 #include <nosys_timer.h>
 #include <types.h>
+#include <cc1101.h>
 #define DBG dbg_printf
 #endif
 #ifndef PACKET_BUF_SIZE
@@ -44,6 +45,7 @@ struct rssi_lqi{
 struct radio_mgr{
 	struct nosys_queue *inq;
 	struct nosys_timer *timer;
+	struct cc1101_mgr *cc1101_mgr;
 	enum radio_state state;
 	u32_t time_in_state;
 	void *userdata;
@@ -55,7 +57,7 @@ struct radio_mgr{
 };
 enum radio_state radio_state_machine(struct radio_mgr *mgr, struct nosys_msg *msg);
 void radio_notify(struct radio_mgr *mgr);
-s32_t radio_send(unsigned char *buffer,int len,void (*radio_send_done_fn)(unsigned int res,void *userdata),void *userdata);
+s32_t radio_send(struct radio_mgr *mgr, unsigned char *buffer,int len,void (*radio_send_done_fn)(unsigned int res,void *userdata),void *userdata);
 void radio_init(void);
 void radio_link_status(struct rssi_lqi *status);
 void radio_fn(void);

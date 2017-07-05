@@ -351,6 +351,50 @@ struct cc1101_hw {
 	struct nosys_queue *recieve_queue;
 
 };
+enum cc1101_send_state{
+	CC1101_SEND_STATE_SET_START,
+	CC1101_SEND_STATE_SET_RX,
+	CC1101_SEND_STATE_SET_TX,
+	CC1101_SEND_STATE_TX_SETTLING,
+	CC1101_SEND_STATE_TX_UNDERFLOW,
+	CC1101_SEND_STATE_FAIL,
+
+};
+
+enum cc1101_recieve_state{
+	CC1101_REC_STATE_START,
+	CC1101_REC_STATE_CHECK_STATUS,
+	CC1101_REC_STATE_CHECK_LENGTH,
+	CC1101_REC_STATE_READ_PACKAGE,
+//	CC1101_REC_STATE_READ_RSSI,
+	CC1101_REC_STATE_FAIL,
+
+};
+enum cc1101_mgr_state{
+	CC1101_STATE_SLEEP = 0,
+	CC1101_STATE_INIT,
+	CC1101_STATE_IDLE,
+	CC1101_STATE_RX,
+	CC1101_STATE_TX,
+};
+
+typedef void (*cc1101_send_done_fn_t)(s32_t res, void *userdata);
+typedef void (*cc1101_recieve_done_fn_t)(s32_t res, void *userdata);
+struct cc1101_mgr{
+	enum cc1101_mgr_state state;
+	struct nosys_queue *inq;
+	struct CCPACKET *send_packet;
+	struct CCPACKET *recieve_packet;
+	void *send_userdata;
+	cc1101_send_done_fn_t send_done_fn;
+	void *recieve_userdata;
+	cc1101_recieve_done_fn_t recieve_done_fn;
+	u32_t time_in_state;
+	enum cc1101_send_state send_state;
+	u32_t time_in_send_state;
+	enum cc1101_recieve_state recieve_state;
+	u32_t time_in_recieve_state;
+};
 void CC1101_init(struct cc1101_hw *hw);
 void CC1101_setSyncWord(byte *sync, boolean save);
 void CC1101_setDefaultRegs(void);
@@ -367,6 +411,9 @@ void CC1101_readBurstReg(byte * buffer, byte regAddr, byte len);
 void CC1101_interrupt(u8_t state);
 u8_t CC1101_interrupt_pin_state(void);
 void CC1101_task_fn(void);
+s32_t CC1101_send(struct cc1101_mgr *mgr,CCPACKET *packet,cc1101_send_done_fn_t send_done_fn,void *userdata);
+s32_t CC1101_recieve(struct cc1101_mgr *mgr, CCPACKET *packet, cc1101_recieve_done_fn_t recieve_done_fn, void *userdata);
+void cc1101_mgr_tick(struct cc1101_mgr *mgr);
 
 
 

@@ -31,6 +31,8 @@
 
 #include "../generic_noarch/debug/debug.h"
 #include <nosys_task.h>
+#include <nosys_queue.h>
+#include <error_codes.h>
 
 //extern GPIO_Handle    hGpio; /* GPIO handle */
 static struct cc1101_hw *hw;
@@ -443,7 +445,7 @@ boolean CC1101_sendData(CCPACKET packet) {
 	// Check that TX state is being entered (state = RXTX_SETTLING)
 	u16_t spinn_check = 0;
 	while (((marcState = (readStatusReg(CC1101_MARCSTATE) & 0x1F)) < 0x10)) {
-		if(spinn_check++ == 250)
+		if (spinn_check++ == 250)
 			return false;
 	}
 
@@ -458,16 +460,16 @@ boolean CC1101_sendData(CCPACKET packet) {
 	}
 
 	// Wait for the sync word to be transmitted
-	spinn_check =0;
-	while (!interrupt_state){
-		if(spinn_check++ == 12500){
+	spinn_check = 0;
+	while (!interrupt_state) {
+		if (spinn_check++ == 12500) {
 			setRxState();
 			return false;
 		}
 	}
 	spinn_check = 0;
-	while (interrupt_state){
-		if(spinn_check++ == 12500){
+	while (interrupt_state) {
+		if (spinn_check++ == 12500) {
 			setRxState();
 			return false;
 		}
@@ -523,16 +525,17 @@ byte CC1101_receiveData(CCPACKET * packet) {
 	// Any byte waiting to be read?
 	// Read data length
 	else if ((packet->length = readConfigReg(CC1101_RXFIFO))) {
-
 		// If packet is too long
 		if (packet->length > CC1101_DATA_LEN) {
 			flushRxFifo();
 			setRxState();
 			packet->crc_ok = 0;
 			packet->length = 0;   // Discard packet
+
 		} else {
 			// Read data packet
-			CC1101_readBurstReg(packet->data, CC1101_RXFIFO, packet->length);
+			CC1101_readBurstReg(&packet->data[0], CC1101_RXFIFO,
+					packet->length);
 			// Read RSSI
 			packet->rssi = readConfigReg(CC1101_RXFIFO);
 			// Read LQI and CRC_OK
@@ -557,6 +560,382 @@ void CC1101_interrupt(u8_t state) {
 	}
 
 }
-u8_t CC1101_interrupt_pin_state(){
+u8_t CC1101_interrupt_pin_state() {
 	return interrupt_state;
+}
+
+static enum cc1101_send_state send_state_machine(struct cc1101_mgr *mgr,
+		struct nosys_msg *msg) {
+	enum cc1101_send_state next_state = mgr->send_state;
+	byte marcState;
+
+	switch (mgr->send_state) {
+	case CC1101_SEND_STATE_SET_START:
+		if(msg->type == NOSYS_MSG_STATE){
+			setRxState();
+		}
+		if (msg->type == NOSYS_MSG_RADIO_SEND) {
+			next_state = CC1101_SEND_STATE_SET_RX;
+		}
+		break;
+	case CC1101_SEND_STATE_SET_RX:
+		// Declare to be in Tx state. This will avoid receiving packets whilst
+		// transmitting
+		// Enter RX state
+		if (msg->type == NOSYS_MSG_STATE) {
+			setRxState();
+		}
+		if (msg->type == NOSYS_TIMER_MSG || msg->type == NOSYS_MSG_STATE) {
+			if (mgr->time_in_send_state > 10) {
+				next_state = CC1101_SEND_STATE_FAIL;
+				break;
+			}
+			marcState = readStatusReg(CC1101_MARCSTATE) & 0x1F;
+			if (marcState == 0x11) {        // RX_OVERFLOW
+				setIdleState();       // Enter IDLE state
+				flushRxFifo();		  // Flush Rx FIFO
+				setRxState();         // Back to RX state
+			}
+			// Check that the RX state has been entered
+			if (marcState == 0x16) {        // TX_UNDERFLOW
+				setIdleState();       // Enter IDLE state
+				flushTxFifo();        // Flush Tx FIFO
+				setRxState();         // Back to RX state
+			}
+			next_state = CC1101_SEND_STATE_SET_TX;
+		}
+		break;
+	case CC1101_SEND_STATE_SET_TX:
+		if (msg->type == NOSYS_MSG_STATE) {
+			// Set data length at the first position of the TX FIFO
+
+			CC1101_writeReg(CC1101_TXFIFO, mgr->send_packet->length);
+			// Write data into the TX FIFO
+			CC1101_writeBurstTXFIFO(CC1101_TXFIFO_BURST,
+					&mgr->send_packet->data[0], mgr->send_packet->length);
+			// CCA enabled: will enter TX state only if the channel is clear
+			setTxState();
+			marcState = readStatusReg(CC1101_MARCSTATE) & 0x1F;
+
+			if(marcState == 0x13 || marcState == 0x14 || marcState == 0x15){
+				next_state = CC1101_SEND_STATE_TX_UNDERFLOW;
+			}else{
+				next_state = CC1101_SEND_STATE_TX_SETTLING;
+			}
+		} else if (msg->type == NOSYS_TIMER_MSG
+				&& mgr->time_in_send_state > 2) {
+			next_state = CC1101_SEND_STATE_FAIL;
+		}
+		break;
+	case CC1101_SEND_STATE_TX_SETTLING:
+		if (msg->type == NOSYS_TIMER_MSG || msg->type == NOSYS_MSG_STATE) {
+			// Check that TX state is being entered (state = RXTX_SETTLING)
+			marcState = readStatusReg(CC1101_MARCSTATE) & 0x1F;
+
+			if ((marcState != 0x10) && (marcState != 0x13)
+					&& (marcState != 0x14) && (marcState != 0x15)) {
+				setIdleState();       // Enter IDLE state
+				flushTxFifo();        // Flush Tx FIFO
+				setRxState();         // Back to RX state
+
+				// Declare to be in Rx state
+				CC1101.rfState = RFSTATE_RX;
+
+				next_state = CC1101_SEND_STATE_FAIL;
+				break;
+			}
+			next_state = CC1101_SEND_STATE_TX_UNDERFLOW;
+		}
+		break;
+	case CC1101_SEND_STATE_TX_UNDERFLOW:
+		if (msg->type == NOSYS_TIMER_MSG || msg->type == NOSYS_MSG_STATE) {
+			marcState = readStatusReg(CC1101_MARCSTATE) & 0x1F;
+			if (marcState == 0x16 || marcState == 0x01) {
+				setRxState();
+				mgr->send_packet = NULL;
+				next_state = CC1101_SEND_STATE_SET_START;
+			}else if(mgr->time_in_send_state> 10){
+				next_state = CC1101_SEND_STATE_FAIL;
+			}
+		}
+		break;
+	case CC1101_SEND_STATE_FAIL:
+		if (msg->type == NOSYS_MSG_STATE) {
+			mgr->send_packet = NULL;
+			setRxState();
+		}
+		break;
+	}
+	return next_state;
+}
+;
+
+static enum cc1101_recieve_state recieve_state_machine(struct cc1101_mgr *mgr,
+		struct nosys_msg *msg) {
+	enum cc1101_recieve_state next_state = mgr->recieve_state;
+	byte marcState;
+
+	switch (mgr->recieve_state) {
+	case CC1101_REC_STATE_START:
+		if(msg->type == NOSYS_MSG_STATE){
+			setRxState();
+		}else if (msg->type == NOSYS_MSG_RADIO_RECIEVED_DATA
+				&& mgr->recieve_packet != NULL) {
+			mgr->recieve_packet->length = 0;
+			next_state = CC1101_REC_STATE_CHECK_STATUS;
+		}
+		break;
+	case CC1101_REC_STATE_CHECK_STATUS:
+		if (msg->type == NOSYS_MSG_STATE) {
+			// Rx FIFO overflow?
+			if (((marcState = readStatusReg(CC1101_MARCSTATE)) & 0x1F)
+					== 0x11) {
+				flushRxFifo();        // Flush Rx FIFO
+				mgr->recieve_packet->length = 0;
+				next_state = CC1101_REC_STATE_FAIL;
+				break;
+			}
+			next_state = CC1101_REC_STATE_CHECK_LENGTH;
+		} else if (msg->type == NOSYS_TIMER_MSG
+				&& mgr->time_in_recieve_state > 2) {
+			next_state = CC1101_REC_STATE_FAIL;
+		}
+		break;
+	case CC1101_REC_STATE_CHECK_LENGTH:
+		if (msg->type == NOSYS_MSG_STATE) {
+			// Any byte waiting to be read?
+			// Read data length
+			if ((mgr->recieve_packet->length = readConfigReg(CC1101_RXFIFO))) {
+				// If packet is too long
+				if (mgr->recieve_packet->length > CC1101_DATA_LEN) {
+					flushRxFifo();
+					setRxState();
+					mgr->recieve_packet->crc_ok = 0;
+					mgr->recieve_packet->length = 0;   // Discard packet
+					next_state = CC1101_REC_STATE_FAIL;
+
+				} else {
+					next_state = CC1101_REC_STATE_READ_PACKAGE;
+				}
+			} else {
+				next_state = CC1101_REC_STATE_FAIL;
+			}
+		} else if (msg->type == NOSYS_TIMER_MSG
+				&& mgr->time_in_recieve_state > 2) {
+			next_state = CC1101_REC_STATE_FAIL;
+		}
+		break;
+	case CC1101_REC_STATE_READ_PACKAGE:
+		if (msg->type == NOSYS_MSG_STATE) {
+			// Read data packet
+			CC1101_readBurstReg(&mgr->recieve_packet->data[0], CC1101_RXFIFO,
+					mgr->recieve_packet->length);
+			// Read RSSI
+			mgr->recieve_packet->rssi = readConfigReg(CC1101_RXFIFO);
+			// Read LQI and CRC_OK
+			marcState = readConfigReg(CC1101_RXFIFO);
+			mgr->recieve_packet->lqi = marcState & 0x7F;
+			mgr->recieve_packet->crc_ok = (marcState & 0x80);
+			// Back to RX state
+			setRxState();
+			next_state = CC1101_REC_STATE_START;
+		} else if (msg->type == NOSYS_TIMER_MSG
+				&& mgr->time_in_recieve_state > 2) {
+			next_state = CC1101_REC_STATE_FAIL;
+		}
+		break;
+
+	case CC1101_REC_STATE_FAIL:
+		if (msg->type == NOSYS_MSG_STATE) {
+			// Back to RX state
+			setRxState();
+		}
+		break;
+
+	}
+	return next_state;
+
+}
+
+static enum cc1101_mgr_state state_machine(struct cc1101_mgr *mgr,
+		struct nosys_msg *msg) {
+	enum cc1101_mgr_state next_state = mgr->state;
+	switch (mgr->state) {
+	case CC1101_STATE_INIT:
+	case CC1101_STATE_SLEEP:
+		break;
+	case CC1101_STATE_IDLE:
+		if(msg->type == NOSYS_MSG_STATE){
+			u8_t marcState = readStatusReg(CC1101_MARCSTATE) & 0x1F;
+			if (marcState == 0x11) {        // RX_OVERFLOW
+				setIdleState();       // Enter IDLE state
+				flushRxFifo();		  // Flush Rx FIFO
+				setRxState();         // Back to RX state
+			}
+			// Check that the RX state has been entered
+			if (marcState == 0x16) {        // TX_UNDERFLOW
+				setIdleState();       // Enter IDLE state
+				flushTxFifo();        // Flush Tx FIFO
+				setRxState();         // Back to RX state
+			}
+
+		}
+		if (msg->type == NOSYS_MSG_RADIO_SEND) {
+			mgr->send_userdata = msg->user_data;
+			mgr->send_packet = (CCPACKET *) msg->data;
+			mgr->send_done_fn = (cc1101_send_done_fn_t) msg->ptr;
+			next_state = CC1101_STATE_TX;
+		}else if(msg->type == NOSYS_MSG_RADIO_RECIEVED_DATA){
+			mgr->recieve_userdata = msg->user_data;
+			mgr->recieve_packet = (CCPACKET *) msg->data;
+			mgr->recieve_done_fn = (cc1101_send_done_fn_t) msg->ptr;
+			next_state = CC1101_STATE_RX;
+		}
+		break;
+	case CC1101_STATE_RX:
+		if (msg->type == NOSYS_MSG_STATE) {
+			mgr->recieve_state = CC1101_REC_STATE_START;
+		} else if (msg->type == NOSYS_TIMER_MSG) {
+			if (mgr->recieve_state == CC1101_REC_STATE_START) {
+				msg->type = NOSYS_MSG_RADIO_RECIEVED_DATA;
+			}
+			while (1) {
+
+				enum cc1101_recieve_state next_rec_state = recieve_state_machine(mgr,
+						msg);
+				if (next_rec_state != mgr->recieve_state) {
+					mgr->recieve_state = next_rec_state;
+					msg->type = NOSYS_MSG_STATE;
+					mgr->time_in_recieve_state = 0;
+				} else {
+					break;
+				}
+			}
+			if (mgr->recieve_state == CC1101_REC_STATE_START) {
+				//Send done ok
+				mgr->recieve_done_fn(ERR_OK, mgr->recieve_userdata);
+				mgr->recieve_done_fn = NULL;
+				mgr->recieve_userdata = NULL;
+				next_state = CC1101_STATE_IDLE;
+			} else if (mgr->recieve_state == CC1101_REC_STATE_FAIL) {
+				//Send failed
+				mgr->recieve_done_fn(ERR_RADIO_RECIEVE_FAIL, mgr->recieve_userdata);
+				mgr->recieve_done_fn = NULL;
+				mgr->recieve_userdata = NULL;
+				next_state = CC1101_STATE_IDLE;
+			}
+		}
+
+		break;
+	case CC1101_STATE_TX:
+		if (msg->type == NOSYS_MSG_STATE) {
+			mgr->send_state = CC1101_SEND_STATE_SET_START;
+		} else if (msg->type == NOSYS_TIMER_MSG) {
+			if (mgr->send_state == CC1101_SEND_STATE_SET_START) {
+				msg->type = NOSYS_MSG_RADIO_SEND;
+			}
+			while (1) {
+
+				enum cc1101_send_state next_send_state = send_state_machine(mgr,
+						msg);
+				if (next_send_state != mgr->send_state) {
+					mgr->send_state = next_send_state;
+					mgr->time_in_send_state = 0;
+					msg->type = NOSYS_MSG_STATE;
+				} else {
+					break;
+				}
+			}
+			if (mgr->send_state	== CC1101_SEND_STATE_SET_START && mgr->send_packet == NULL) {
+				//Send done ok
+				if(mgr->send_done_fn){
+					mgr->send_done_fn(ERR_OK, mgr->send_userdata);
+				}
+				mgr->send_done_fn = NULL;
+				mgr->send_userdata = NULL;
+				next_state = CC1101_STATE_IDLE;
+			} else if (mgr->send_state == CC1101_SEND_STATE_FAIL) {
+				//Send failed
+				if (mgr->send_done_fn) {
+					mgr->send_done_fn(ERR_RADIO_SEND_FAILED,
+							mgr->send_userdata);
+				}
+				mgr->send_done_fn = NULL;
+				mgr->send_userdata = NULL;
+				next_state = CC1101_STATE_IDLE;
+			}
+		}
+		break;
+	}
+
+	return next_state;
+}
+s32_t CC1101_send(struct cc1101_mgr *mgr, CCPACKET *packet,
+		cc1101_send_done_fn_t send_done_fn, void *userdata) {
+	if (mgr->state == CC1101_STATE_IDLE) {
+		struct nosys_msg *msg = nosys_queue_create_msg();
+
+		if (msg == NULL)
+			return ERR_ALLOC_MEM_FAILED;
+
+		msg->type = NOSYS_MSG_RADIO_SEND;
+		msg->data = packet;
+		msg->user_data = userdata;
+		msg->ptr = send_done_fn;
+		nosys_queue_add_last(mgr->inq, msg);
+	} else {
+		return ERR_RADIO_SIGNALING_BUSY;
+	}
+	return ERR_OK;
+}
+s32_t CC1101_recieve(struct cc1101_mgr *mgr, CCPACKET *packet,
+		cc1101_recieve_done_fn_t recieve_done_fn, void *userdata) {
+	if (mgr->state == CC1101_STATE_IDLE) {
+		struct nosys_msg *msg = nosys_queue_create_msg();
+
+		if (msg == NULL)
+			return ERR_ALLOC_MEM_FAILED;
+
+		msg->type = NOSYS_MSG_RADIO_RECIEVED_DATA;
+		msg->data = packet;
+		msg->user_data = userdata;
+		msg->ptr = recieve_done_fn;
+		nosys_queue_add_last(mgr->inq, msg);
+
+	} else {
+		return ERR_RADIO_SIGNALING_BUSY;
+	}
+	return ERR_OK;
+}
+void cc1101_mgr_tick(struct cc1101_mgr *mgr){
+	mgr->time_in_state++;
+
+	if(mgr->state == CC1101_STATE_RX){
+		mgr->time_in_recieve_state++;
+	}else if(mgr->state == CC1101_STATE_TX){
+		mgr->time_in_send_state++;
+	}
+
+	struct nosys_msg *msg = nosys_queue_create_msg();
+	if(!msg) return;
+
+	msg->type = NOSYS_TIMER_MSG;
+	nosys_queue_add_last(mgr->inq,msg);
+}
+void CC1101_task_fn(void) {
+	struct cc1101_mgr *mgr = (struct cc1101_mgr*) self->user_data;
+	struct nosys_msg *msg = nosys_msg_get();
+
+	if(msg->type == NOSYS_TIMER_MSG){
+	}
+	while (1) {
+		enum cc1101_mgr_state next_state = state_machine(mgr, msg);
+		if (mgr->state != next_state) {
+			mgr->state = next_state;
+			msg->type = NOSYS_MSG_STATE;
+		} else {
+			break;
+		}
+	}
+	nosys_queue_msg_destroy(msg);
 }

@@ -30,6 +30,7 @@ struct radio_msg_send_queue {
 	u8_t len;
 	u8_t resends;
 	u8_t require_ack;
+	u32_t result;
 	void *userdata;
 	void (*send_done_cb)(s32_t res, void *userdata);
 	struct radio_msg_send_queue *next;
@@ -44,6 +45,7 @@ struct radio_msg_mgr {
 	u32_t time_in_state;
 	u32_t local_address;
 	u8_t handle_broadcast;
+	u8_t fail_count;
 	void (*tx_led_on)(void);
 	void (*tx_led_off)(void);
 	void (*rx_led_on)(void);
@@ -58,6 +60,6 @@ void radio_msg_mgr_fn(void);
 void radio_msg_mgr_data_recieved_cb(unsigned char *data, unsigned char len,
 		unsigned char rssi, unsigned char lqi, void *userdata);
 s32_t radio_msg_send(void *data, u8_t len, u8_t require_ack, void *userdata,
-		void (*send_done_cb)(s32_t res, void *userdata));
+		void (*send_done_cb)(s32_t res, void *userdata), struct radio_msg_mgr *radio_mgr);
 void radio_msg_mgr_reset(struct radio_msg_mgr *mgr);
 #endif /* SRC_RADIO_RADIO_MSG_MGR_H_ */
