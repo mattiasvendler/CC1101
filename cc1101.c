@@ -623,7 +623,7 @@ static enum cc1101_send_state send_state_machine(struct cc1101_mgr *mgr,
 				next_state = CC1101_SEND_STATE_TX_SETTLING;
 			}
 		} else if (msg->type == NOSYS_TIMER_MSG
-				&& mgr->time_in_send_state > 2) {
+				&& mgr->time_in_send_state > 10) {
 			next_state = CC1101_SEND_STATE_FAIL;
 		}
 		break;
@@ -721,7 +721,7 @@ static enum cc1101_recieve_state recieve_state_machine(struct cc1101_mgr *mgr,
 				next_state = CC1101_REC_STATE_FAIL;
 			}
 		} else if (msg->type == NOSYS_TIMER_MSG
-				&& mgr->time_in_recieve_state > 2) {
+				&& mgr->time_in_recieve_state > 10) {
 			next_state = CC1101_REC_STATE_FAIL;
 		}
 		break;
@@ -740,7 +740,7 @@ static enum cc1101_recieve_state recieve_state_machine(struct cc1101_mgr *mgr,
 			setRxState();
 			next_state = CC1101_REC_STATE_START;
 		} else if (msg->type == NOSYS_TIMER_MSG
-				&& mgr->time_in_recieve_state > 2) {
+				&& mgr->time_in_recieve_state > 10) {
 			next_state = CC1101_REC_STATE_FAIL;
 		}
 		break;

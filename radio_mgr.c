@@ -51,6 +51,7 @@ enum radio_state radio_state_machine(struct radio_mgr *mgr,
 	enum radio_state next_state = mgr->state;
 	switch (mgr->state) {
 	case RADIO_STATE_INIT: {
+		next_state = RADIO_STATE_RESET;
 		break;
 	}
 	case RADIO_STATE_RESET:
@@ -69,16 +70,15 @@ enum radio_state radio_state_machine(struct radio_mgr *mgr,
 			mgr->cc1101_mgr->state = CC1101_STATE_IDLE;
 			mgr->cc1101_mgr->recieve_state = CC1101_REC_STATE_START;
 			mgr->cc1101_mgr->send_state = CC1101_SEND_STATE_SET_START;
-		} else if (msg->type == NOSYS_TIMER_MSG) {
+		} else if (msg->type == NOSYS_TIMER_MSG && (mgr->time_in_state % 10 == 0)) {
 			byte marcState = (getMarcState() & 0x1F);
 			if (marcState == 0x0D) {
-				setRxState();
 				if (mgr->reset_queue) {
 					post_msg(mgr->reset_queue, NOSYS_MSG_RADIO_RESET_DONE);
 				}
 				next_state = RADIO_STATE_IDLE;
 			} else {
-				setRxState();
+				CC1101_init(&cc1101_hw);
 			}
 		}
 		break;
@@ -141,7 +141,7 @@ enum radio_state radio_state_machine(struct radio_mgr *mgr,
 				next_state = RADIO_STATE_RESET;
 			}
 
-		}else if(msg->type == NOSYS_TIMER_MSG && mgr->time_in_state > 10){
+		}else if(msg->type == NOSYS_TIMER_MSG && mgr->time_in_state > 30){
 			next_state = RADIO_STATE_RESET;
 		}
 		break;
@@ -177,6 +177,8 @@ enum radio_state radio_state_machine(struct radio_mgr *mgr,
 			} else {
 				next_state = RADIO_STATE_RESET;
 			}
+		}else if(msg->type == NOSYS_TIMER_MSG && mgr->time_in_state > 30){
+			next_state = RADIO_STATE_RESET;
 		}
 
 		break;
