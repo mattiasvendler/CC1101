@@ -713,7 +713,7 @@ static enum cc1101_recieve_state recieve_state_machine(struct cc1101_mgr *mgr,
 					mgr->recieve_packet->crc_ok = 0;
 					mgr->recieve_packet->length = 0;   // Discard packet
 					next_state = CC1101_REC_STATE_FAIL;
-
+					break;
 				} else {
 					next_state = CC1101_REC_STATE_READ_PACKAGE;
 				}
@@ -800,7 +800,7 @@ static enum cc1101_mgr_state state_machine(struct cc1101_mgr *mgr,
 				msg->type = NOSYS_MSG_RADIO_RECIEVED_DATA;
 			}
 			while (1) {
-
+//				dbg_printf("%d %d\n",mgr->state,mgr->recieve_state);
 				enum cc1101_recieve_state next_rec_state = recieve_state_machine(mgr,
 						msg);
 				if (next_rec_state != mgr->recieve_state) {
@@ -835,7 +835,7 @@ static enum cc1101_mgr_state state_machine(struct cc1101_mgr *mgr,
 				msg->type = NOSYS_MSG_RADIO_SEND;
 			}
 			while (1) {
-
+//				dbg_printf("%d %d\n",mgr->state,mgr->send_state);
 				enum cc1101_send_state next_send_state = send_state_machine(mgr,
 						msg);
 				if (next_send_state != mgr->send_state) {
