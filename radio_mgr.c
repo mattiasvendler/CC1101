@@ -10,13 +10,11 @@
 #include <nosys_task.h>
 #include <nosys_queue.h>
 #include <error_codes.h>
-struct radio_mgr radio_mgr;
 static CCPACKET in_packet;
 static struct packet_queue *current_packet;
 static struct packet_queue packet_buf;
 struct cc1101_hw cc1101_hw;
 #define RESET_TIME_IN_STATE mgr->time_in_state = 0
-static struct packet_queue *queue;
 struct rssi_lqi status;
 //#define STATE_DEBUG
 #ifdef STATE_DEBUG
@@ -62,7 +60,6 @@ enum radio_state radio_state_machine(struct radio_mgr *mgr,
 			}
 			CC1101_init(&cc1101_hw);
 
-			queue = NULL;
 			if (current_packet != NULL) {
 				memset(current_packet, 0, sizeof(struct packet_queue));
 				current_packet = NULL;
@@ -113,11 +110,6 @@ enum radio_state radio_state_machine(struct radio_mgr *mgr,
 
 
 			next_state = RADIO_STATE_TX;
-		} else if (msg->type == NOSYS_TIMER_MSG) {
-			if ((mgr->time_in_state % 10 == 0)
-					&& ((getMarcState() & 0x1F) != 0x0D)) {
-				next_state = RADIO_STATE_RESET;
-			}
 		}
 		break;
 	case RADIO_STATE_RX:
@@ -135,11 +127,7 @@ enum radio_state radio_state_machine(struct radio_mgr *mgr,
 						(unsigned char) in_packet.rssi,
 						(unsigned char) in_packet.lqi, mgr->userdata);
 			}
-			if (msg->value == ERR_OK) {
 				next_state = RADIO_STATE_IDLE;
-			} else {
-				next_state = RADIO_STATE_RESET;
-			}
 
 		}else if(msg->type == NOSYS_TIMER_MSG && mgr->time_in_state > 30){
 			next_state = RADIO_STATE_RESET;
@@ -149,7 +137,7 @@ enum radio_state radio_state_machine(struct radio_mgr *mgr,
 		if (msg->type == NOSYS_MSG_STATE) {
 
 			if (current_packet == NULL) {
-				next_state = RADIO_STATE_RESET;
+				next_state = RADIO_STATE_IDLE;
 				break;
 			}
 			if (CC1101_send(mgr->cc1101_mgr, &current_packet->packet,
@@ -172,11 +160,7 @@ enum radio_state radio_state_machine(struct radio_mgr *mgr,
 						current_packet->userdata);
 			}
 
-			if (msg->value == ERR_OK) {
 				next_state = RADIO_STATE_IDLE;
-			} else {
-				next_state = RADIO_STATE_RESET;
-			}
 		}else if(msg->type == NOSYS_TIMER_MSG && mgr->time_in_state > 30){
 			next_state = RADIO_STATE_RESET;
 		}
@@ -232,7 +216,6 @@ void radio_notify(struct radio_mgr *mgr) {
 }
 
 void radio_init() {
-	radio_mgr.state = RADIO_STATE_INIT;
 	current_packet = NULL;
 
 }

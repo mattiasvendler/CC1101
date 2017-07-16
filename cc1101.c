@@ -705,7 +705,7 @@ static enum cc1101_recieve_state recieve_state_machine(struct cc1101_mgr *mgr,
 		if (msg->type == NOSYS_MSG_STATE) {
 			// Any byte waiting to be read?
 			// Read data length
-			if ((mgr->recieve_packet->length = readConfigReg(CC1101_RXFIFO))) {
+			if ((mgr->recieve_packet->length = readConfigReg(CC1101_RXFIFO)) && (readStatusReg(CC1101_RXBYTES)&~(0x80)) >= mgr->recieve_packet->length + 1) {
 				// If packet is too long
 				if (mgr->recieve_packet->length > CC1101_DATA_LEN) {
 					flushRxFifo();
@@ -728,6 +728,7 @@ static enum cc1101_recieve_state recieve_state_machine(struct cc1101_mgr *mgr,
 	case CC1101_REC_STATE_READ_PACKAGE:
 		if (msg->type == NOSYS_MSG_STATE) {
 			// Read data packet
+
 			CC1101_readBurstReg(&mgr->recieve_packet->data[0], CC1101_RXFIFO,
 					mgr->recieve_packet->length);
 			// Read RSSI
@@ -766,18 +767,10 @@ static enum cc1101_mgr_state state_machine(struct cc1101_mgr *mgr,
 		break;
 	case CC1101_STATE_IDLE:
 		if(msg->type == NOSYS_MSG_STATE){
-			u8_t marcState = readStatusReg(CC1101_MARCSTATE) & 0x1F;
-			if (marcState == 0x11) {        // RX_OVERFLOW
-				setIdleState();       // Enter IDLE state
-				flushRxFifo();		  // Flush Rx FIFO
-				setRxState();         // Back to RX state
-			}
-			// Check that the RX state has been entered
-			if (marcState == 0x16) {        // TX_UNDERFLOW
-				setIdleState();       // Enter IDLE state
-				flushTxFifo();        // Flush Tx FIFO
-				setRxState();         // Back to RX state
-			}
+			setIdleState();       // Enter IDLE state
+			flushRxFifo();
+			flushTxFifo();        // Flush Tx FIFO
+			setRxState();         // Back to RX state
 
 		}
 		if (msg->type == NOSYS_MSG_RADIO_SEND) {
@@ -791,6 +784,7 @@ static enum cc1101_mgr_state state_machine(struct cc1101_mgr *mgr,
 			mgr->recieve_done_fn = (cc1101_send_done_fn_t) msg->ptr;
 			next_state = CC1101_STATE_RX;
 		}
+
 		break;
 	case CC1101_STATE_RX:
 		if (msg->type == NOSYS_MSG_STATE) {
