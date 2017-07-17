@@ -21,6 +21,7 @@
 #define CMD_PERIODIC_STATUS			0x06
 #define CMD_TEMPERATURE_MSG			0x07
 #define CMD_TEMPERATURE_SAMPLE_RATE 0x08
+#define CMD_NODE_POWER_UP			0x09
 
 #define htons(A) ((((A) & 0xff00) >> 8) | (((A) & 0x00ff) << 8))
 
@@ -58,9 +59,13 @@ typedef struct radio_msg_temperature{
 	u16_t value;
 }__attribute__((packed)) radio_msg_temperature_t;
 
+typedef struct radio_msg_node_power_up {
+	struct radio_packet_header header;
+}__attribute__((packed)) radio_msg_node_power_up_t;
+
 void radio_msg_hello_init(u8_t *buf,u32_t my_address);
 void radio_msg_login_response_init(u8_t *buf, u32_t target,u32_t my_address);
 void radio_msg_periodic_status_init(u8_t *buf,u32_t target, u32_t my_address,u16_t value);
 void radio_msg_temperature_status_init(u8_t *buf, u32_t target, u32_t my_address, u16_t value);
-
+void radio_msg_node_power_up_init(u8_t *buf, u32_t target, u32_t my_address);
 #endif /* SRC_RADIO_RADIO_MSG_H_ */
