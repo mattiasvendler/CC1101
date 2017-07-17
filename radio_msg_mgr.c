@@ -211,7 +211,7 @@ static enum radio_msg_mgr_state radio_msg_mgr_statemachine(
 				struct radio_packet_header *h =
 						(struct radio_packet_header *) &rx_buff[0];
 				if (h->length
-						< (RX_BUF_SIZE - sizeof(struct radio_packet_header))) {
+						< (RX_BUF_SIZE - sizeof(struct radio_packet_header)) && mgr->node_allowed(h->source)) {
 					mgr->radio_recieved_cb(
 							sizeof(struct radio_packet_header) + h->length,
 							&rx_buff[0], mgr->user);
